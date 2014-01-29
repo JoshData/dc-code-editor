@@ -1,0 +1,4 @@
+django==1.6
+django-json-field
+pygit2==0.19 # must match installed version of libgit2
+lxml

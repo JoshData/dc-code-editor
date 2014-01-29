@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{patch.get_display_title}}{% endblock %}
+
+{% block body %}
+
+
+	<h1>{{patch.get_display_title}}</h1>
+
+	{% if not patch.base_patch %}
+		<div style="margin-left: 2em; white-space: pre;">{{patch.title}}</div>
+
+		<p>This is a base revision.</p>
+	{% else %}
+
+		{% if not patch.has_changes %}
+			<p>This patch does not have any changes to the Code yet.</p>
+		{% endif %}
+
+	{% endif %}
+
+	{% if patch.can_create_subpatch %}
+		<p>Start a <a href="{{patch.get_absolute_url}}/_new">new patch</a> based on the text of the Code as it appears here?</p>
+	{% endif %}
+
+	{% if patch.can_modify %}
+		<h2>Modify a File</h2>
+
+		{% if patch.has_changes %}
+		<p>Continue editing...</p>
+		<ul>
+			{% for change in patch.changed_files.all %}
+				<li><a href="{{change.get_absolute_url}}">{{change.filename}}</a></li>
+			{% endfor %}
+		</ul>
+		{% endif %}
+
+		<p>Choose a file below to modify.</p>
+
+		<ul style="list-style: none">
+		{% if path %}
+			<li>[<a href="{{patch.get_absolute_url}}?path={{path_up}}">&mdash; go up a level &mdash;</a>]</li>
+		{% endif %}
+		{% for filepath, filename, filetype in files %}
+		<li>
+			{% if filetype == "dir" %}
+				[<a href="{{patch.get_absolute_url}}?path={{filepath}}">{{filename}}</a>]
+			{% else %}
+				<a href="{{patch.get_absolute_url}}/_edit?file={{filepath}}">{{filename}}</a>
+			{% endif %}
+		</li>
+		{% endfor %}
+		</ul>
+
+	{% endif %}
+
+{% endblock %}

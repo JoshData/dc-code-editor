@@ -1,0 +1,20 @@
+/* Text Editor */
+
+#editor_left_panel, #editor_right_panel {
+	width: 49%;
+	float: left;
+}
+	#editor_textarea {
+		width: 90%;
+	}
+
+	.editor_text_modified {
+		background-color: #FCA;
+		font-weight: bold;
+	}
+
+	#editor_preview {
+		background-color: #FAFAFA;
+		min-height: 1000px;
+	}
+

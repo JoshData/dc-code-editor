@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}{{change.filename}} -- {{patch.get_display_title}}{% endblock %}
+
+{% block head %}
+<!-- Create a simple CodeMirror instance -->
+<link rel="stylesheet" href="/static/lib/codemirror.css">
+{% endblock %}
+
+{% block body %}
+
+	<p style="margin: 0">
+		<a href="{{patch.get_absolute_url}}">{{patch.get_display_title}}</a>
+		{% if change.title != change.filename %} &gt; {{change.filename}}{% endif %}
+	</p>
+	<h1 style="margin: 0">{{change.title}}</h1>
+
+	<div id="editor_two_panel">
+		<div id="save_status">&nbsp;</div>
+
+		<div id="editor_left_panel">
+			<h2>Edit Page</h2>
+
+			<textarea id="editor_textarea">{{current_text}}</textarea>
+		</div>
+
+		<div id="editor_right_panel">
+			<h2>Preview</h2>
+			<div id="editor_preview">
+			</div>
+		</div>
+	</div>
+{% endblock %}
+
+{% block scripts %}
+	<script src="/static/lib/codemirror.js"></script>
+	<script src="/static/lib/codemirror_mode_xml.js"></script>
+	<script src="/static/lib/google-diff-match-patch.js"></script>
+
+	<script>
+	  var base_text = "{{base_text|escapejs}}";
+	  var dmp = new diff_match_patch();
+	  dmp.Diff_Timeout = .075; // otherwise the computation can be slow and interfere with the UI
+
+	  var editor = CodeMirror.fromTextArea($("#editor_textarea")[0], {
+	    mode: "text/xml",
+	    lineWrapping: true,
+	    autofocus: true,
+	  });
+	  editor.setSize("100%", "100%");
+	  editor.on('change', on_change);
+	  $(function() {
+	  	// things to do on initialization
+	  	update_diff();
+	  	update_preview()
+	  });
+
+	  var on_change_delayed_250_flag = 0;
+	  var on_change_delayed_2000_flag = 0;
+
+	  var current_diff_markers = [];
+
+	  function on_change() {
+	  	$('#save_status').text("Not saved...");
+
+	  	on_change_delayed_250_flag++;
+	  	on_change_delayed_2000_flag++;
+	  	setTimeout('on_change_delayed_250()', 250);
+	  	setTimeout('on_change_delayed_2000()', 2000);
+	  }
+
+	  function on_change_delayed_250() {
+	  	on_change_delayed_250_flag--;
+	  	if (on_change_delayed_250_flag != 0) return;
+
+	  	update_diff();
+	  	update_preview();
+	  }
+
+	  function update_diff() {
+	  	var diff = dmp.diff_main(base_text, editor.getValue(), true);
+	  	var line_no = 0;
+	  	var col_no = 0;
+	  	var prev_pos = {line: 0, ch: 0};
+	  	for (var i = 0; i < current_diff_markers.length; i++) current_diff_markers[i].clear();
+	  	function mark_text(through_pos, className) {
+	  		var m = editor.markText(prev_pos, through_pos, { className: className })
+	  		prev_pos = through_pos;
+	  		current_diff_markers.push(m);
+	  	}
+	  	for (var i = 0; i < diff.length; i++) {
+	  		if (diff[i][0] == DIFF_DELETE) continue; // this range is no longer displayed in the editor
+
+	  		var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_modified" : "";
+	  		if (!diff[i][1].match(/\S/) || (i > 0 && i < diff.length-1 && diff[i][1].length < (diff[i-1][1].length+diff[i+1][1].length)/2)) {
+	  			// if a DIFF_EQUAL hunk is just whitespace or very short, display it as if it is
+	  			// a modification since it is probably a part of the same logical change as
+	  			// the hunks around it.
+	  			className = "editor_text_modified";
+	  		}
+
+	  		for (var c = 0; c < diff[i][1].length; c++) {
+	  			col_no++;
+	  			if (diff[i][1].charAt(c) == '\n') {
+	  				mark_text({line: line_no, ch: col_no}, className);
+	  				line_no++;
+	  				col_no = 0;
+	  			}
+	  		}
+			mark_text({line: line_no, ch: col_no}, className);
+	  	}
+	  }
+
+	  function on_change_delayed_2000() {
+	  	on_change_delayed_2000_flag--;
+	  	if (on_change_delayed_2000_flag != 0) return;
+
+	  	save_document();
+	  }
+
+	  function save_document() {
+	  	$.ajax(
+	  		"/update-change",
+	  		{
+	  			data: {
+	  				patch: {{patch.id}},
+	  				change: {{change.id}},
+	  				text: editor.getValue()
+	  			},
+	  			method: "POST",
+	  			success: function(res) {
+	  				if (res.status == "ok")
+				  		$('#save_status').text("Saved.");
+				  	else
+				  		$('#save_status').text(res.msg);
+	  			},
+	  			error: function() {
+				  	$('#save_status').text("Error saving changes.");
+	  			},
+	  		});
+	  }
+
+	  function update_preview() {
+	  	$.ajax(
+	  		"/render-body",
+	  		{
+	  			data: {
+	  				text: editor.getValue()
+	  			},
+	  			method: "POST",
+	  			success: function(res) {
+	  				if (res.status == "ok")
+				  		$('#editor_preview').html(res.html);
+				  	else
+				  		$('#editor_preview').text(res.msg);
+				  	$('#editor_preview a').each(function() {
+				  		this.setAttribute("target", "_blank")
+				  	})
+	  			},
+	  			error: function() {
+				  	$('#editor_preview').text("Error creating the preview.");
+	  			},
+	  		});
+	  }
+
+	</script>
+
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Open Patch{% endblock %}
+
+{% block body %}
+
+
+	<h1>Open a Code Patch</h1>
+
+	{% for patch in patches %}
+		<div>
+			<p><a href="{{patch.get_absolute_url}}">{{patch.get_display_title}}</a></p>
+			{% if not patch.base_patch %}
+				<div style="margin-left: 2em; white-space: pre;">{{patch.title}}</div>
+			{% endif %}
+		</div>
+	{% endfor %}
+
+{% endblock %}
