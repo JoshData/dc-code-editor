@@ -4,37 +4,26 @@
 
 {% block body %}
 <div class="container">
-	<h1>{{patch.title}}</h1>
-
-	{% if not patch.base_patch %}
-		<div style="margin-left: 2em; white-space: pre;">{{patch.title}}</div>
-
-		<p>This is a base revision.</p>
-	{% else %}
-
-		{% if not patch.has_changes %}
-			<p>This patch does not have any changes to the Code yet.</p>
-		{% endif %}
-
-	{% endif %}
+	<p id="rename_patch" style="font-size: 80%; color: #444; margin: 0;">rename</p>
+	<h1 style="margin-top: 0">{{patch.title}}</h1>
 
 	{% if patch.can_modify %}
 	<div class="row">
+		{% if patch.has_changes %}
 		<div class="col-sm-6">
-			<h2>Continue Editing</h2>
+			<h2>Continue Editing...</h2>
 
-			{% if patch.has_changes %}
-			<p>Continue editing...</p>
 			<ul style="list-style: none; padding: 0;">
 				{% for change in patch.changed_files.all %}
 					<li><a href="{{change.get_absolute_url}}">{{change.filename}}</a></li>
 				{% endfor %}
 			</ul>
-			{% endif %}
+
 		</div>
+		{% endif %}
 
 		<div class="col-sm-6">
-			<h2>Edit New File...</h2>
+			<h2>Edit {% if patch.has_changes %}New{% endif %} File...</h2>
 
 			<p>Choose a file below to modify it:</p>
 
@@ -61,4 +50,31 @@
 		<p>Start a <a href="{{patch.get_absolute_url}}/_new">new patch</a> based on the text of the Code as it appears in this patch?</p>
 	{% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+	$(function() {
+		$('#rename_patch').css({cursor: "pointer"}).click(function() {
+			var elem = $('h1');
+			var new_value = prompt("Rename this patch?", elem.text());
+			if (!new_value) return;
+
+		  	$.ajax(
+		  		"{{patch.get_absolute_url|escapejs}}/_rename",
+		  		{
+		  			data: {
+		  				value: new_value,
+		  			},
+		  			method: "POST",
+		  			success: function(res) {
+		  				elem.text(new_value);
+		  			},
+		  			error: function() {
+					  	alert("Error saving change.");
+		  			},
+		  		});
+		});
+	})
+</script
 {% endblock %}

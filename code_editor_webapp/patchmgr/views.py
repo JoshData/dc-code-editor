@@ -41,6 +41,14 @@ def new_patch(request, patch_id):
         )
     return redirect(p)
 
+@json_response
+def patch_action(request, patch_id, action):
+    patch = get_object_or_404(Patch, pk=patch_id)
+    if action == "rename":
+        patch.title = request.POST["value"]
+        patch.save()
+    return { "status": "ok" }
+
 def edit_file_redirector(request, patch_id):
     patch = get_object_or_404(Patch, pk=patch_id)
     if not patch.can_modify(): raise ValueError("This patch cannot be modified.")
@@ -69,7 +77,6 @@ def edit_file(request, patch_id, change_id):
 @json_response
 def update_change(request):
     if request.method != "POST": raise Exception()
-    print (request.POST["patch"])
     patch = get_object_or_404(Patch, pk=request.POST["patch"])
     if not patch.can_modify(): raise ValueError("This patch cannot be modified.")
     change = get_object_or_404(ChangedFile, patch=patch, pk=request.POST["change"])

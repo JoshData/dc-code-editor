@@ -15,6 +15,7 @@ urlpatterns = patterns('',
     url(r'^patch/(\d+)/_new$', 'patchmgr.views.new_patch'),
     url(r'^patch/(\d+)/_edit$', 'patchmgr.views.edit_file_redirector'),
     url(r'^patch/(\d+)/(\d+)$', 'patchmgr.views.edit_file'),
+    url(r'^patch/(\d+)/_(rename)$', 'patchmgr.views.patch_action'),
     url(r'^update-change$', 'patchmgr.views.update_change'),
     url(r'^render-body$', 'patchmgr.views.render_body'),
 )
