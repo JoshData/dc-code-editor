@@ -8,8 +8,14 @@
 	}
 
 	.editor_text_modified {
-		background-color: #FCA;
+		background-color: #FEE;
 		font-weight: bold;
+	}
+
+	.editor_text_deleted {
+		background-color: #FEE;
+		color: #888;
+		text-decoration: line-through;
 	}
 
 	#editor_preview {

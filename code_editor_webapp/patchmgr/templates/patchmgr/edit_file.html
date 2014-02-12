@@ -24,7 +24,7 @@
 			<div id="save_status">&nbsp;</div>
 			<h2>Edit File</h2>
 
-			<textarea id="editor_textarea">{{current_text}}</textarea>
+			<textarea id="editor_textarea" style="display: none">{{current_text}}</textarea>
 		</div>
 
 		<div class="col-sm-6">
@@ -49,6 +49,7 @@
 	    mode: "text/xml",
 	    lineWrapping: true,
 	    autofocus: true,
+	    lineNumbers: true
 	  });
 	  editor.setSize("100%", "100%");
 	  editor.on('change', on_change);
@@ -58,42 +59,54 @@
 	  	update_preview()
 	  });
 
-	  var on_change_delayed_250_flag = 0;
-	  var on_change_delayed_2000_flag = 0;
-
-	  var current_diff_markers = [];
+	  // Utility code to fire a delayed event but if the event is fired
+	  // successively before the callback is executed, only execute the
+	  // callback once on the last-initiated delay.
+	  var delayed_event_flags = { };
+	  function fire_delayed_event(name, delay) {
+	  	if (!(name in delayed_event_flags)) delayed_event_flags[name] = 0;
+	  	delayed_event_flags[name]++;
+	  	var v = "delayed_event_flags['" + name + "']";
+	  	setTimeout(v + "--; if (" + v + " == 0) " + name + '()', delay);
+	  }
 
 	  function on_change() {
 	  	$('#save_status').text("Not Saved").attr("class", "text-danger");
 
-	  	on_change_delayed_250_flag++;
-	  	on_change_delayed_2000_flag++;
-	  	setTimeout('on_change_delayed_250()', 250);
-	  	setTimeout('on_change_delayed_2000()', 2000);
+	  	fire_delayed_event('on_change_delayed_250', 250);
+	  	fire_delayed_event('on_change_delayed_2000', 2000);
 	  }
 
 	  function on_change_delayed_250() {
-	  	on_change_delayed_250_flag--;
-	  	if (on_change_delayed_250_flag != 0) return;
-
 	  	update_diff();
 	  	update_preview();
 	  }
 
+	  var current_diff_markers = [];
 	  function update_diff() {
-	  	var diff = dmp.diff_main(base_text, editor.getValue(), true);
+	  	// Uses text marks in the code editor to show text that was modified or inserted.
+
+	  	// clear any markers we set last time around
+	  	for (var i = 0; i < current_diff_markers.length; i++) current_diff_markers[i].clear();
+
+	  	// track our position, and a utility function using a closure to add a marker
 	  	var line_no = 0;
 	  	var col_no = 0;
 	  	var prev_pos = {line: 0, ch: 0};
-	  	for (var i = 0; i < current_diff_markers.length; i++) current_diff_markers[i].clear();
-	  	function mark_text(through_pos, className) {
-	  		var m = editor.markText(prev_pos, through_pos, { className: className })
-	  		prev_pos = through_pos;
+	  	function mark_text(through_pos, className, is_deletion, replaced_text) {
+	  		var m;
+	  		if (!is_deletion) {
+		  		m = editor.markText(prev_pos, through_pos, { className: className })
+		  	} else {
+		  		m = editor.setBookmark(through_pos, { widget: $("<span class='editor_text_deleted'> </span>").text(replaced_text)[0] })
+		  	}
 	  		current_diff_markers.push(m);
+	  		prev_pos = through_pos;
 	  	}
-	  	for (var i = 0; i < diff.length; i++) {
-	  		if (diff[i][0] == DIFF_DELETE) continue; // this range is no longer displayed in the editor
 
+	  	// use Google Diff Match Patch to compare the old and new text
+	  	var diff = dmp.diff_main(base_text, editor.getValue(), true);
+	  	for (var i = 0; i < diff.length; i++) {
 	  		var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_modified" : "";
 	  		if (!diff[i][1].match(/\S/) || (i > 0 && i < diff.length-1 && diff[i][1].length < (diff[i-1][1].length+diff[i+1][1].length)/2)) {
 	  			// if a DIFF_EQUAL hunk is just whitespace or very short, display it as if it is
@@ -102,22 +115,23 @@
 	  			className = "editor_text_modified";
 	  		}
 
-	  		for (var c = 0; c < diff[i][1].length; c++) {
-	  			col_no++;
-	  			if (diff[i][1].charAt(c) == '\n') {
-	  				mark_text({line: line_no, ch: col_no}, className);
-	  				line_no++;
-	  				col_no = 0;
-	  			}
-	  		}
-			mark_text({line: line_no, ch: col_no}, className);
+	  		if (diff[i][0] != DIFF_DELETE) {
+		  		for (var c = 0; c < diff[i][1].length; c++) {
+		  			col_no++;
+		  			if (diff[i][1].charAt(c) == '\n') {
+		  				mark_text({line: line_no, ch: col_no}, className);
+		  				line_no++;
+		  				col_no = 0;
+		  			}
+		  		}
+		  	}
+
+		  	var replaced_text = diff[i][1];
+			mark_text({line: line_no, ch: col_no}, className, diff[i][0] == DIFF_DELETE, replaced_text);
 	  	}
 	  }
 
 	  function on_change_delayed_2000() {
-	  	on_change_delayed_2000_flag--;
-	  	if (on_change_delayed_2000_flag != 0) return;
-
 	  	save_document();
 	  }
 
