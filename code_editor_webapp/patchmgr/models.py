@@ -14,8 +14,8 @@ class Patch(models.Model):
     base_patch = models.ForeignKey('Patch', blank=True, null=True, on_delete=models.PROTECT,
     	help_text="Another Patch object that this Patch is applied on top of. In many cases, the base patch is a root patch that refers to a git commit with the base text of the code. For root patches, this is null.")
 
-    root_patch_hash = models.CharField(max_length=40, blank=True, null=True,
-    	help_text="For root patches, the SHA1 hash (in hex) of the git commmit containing the base text of the Code that this patch is based on. For non-root hashes, not used and must be null.")
+    commit_hash = models.CharField(max_length=40, blank=True, null=True,
+        help_text="For non-root patches, the SHA1 hash (in hex) of the git commmit that this patch was published to.")
 
     metadata = JSONField(default={}, blank=True,
         help_text="Metadata associated with the change, such as notes, the reason for the chance (e.g. a DC Law number), the effective date, and so on.")
@@ -24,16 +24,18 @@ class Patch(models.Model):
         return "Patch(%d, %s, %s, %s)" % (
             self.id,
             self.created.isoformat(),
-            str(self.base_patch) if self.base_patch else self.root_patch_hash,
+            str(self.base_patch) if self.base_patch else self.commit_hash,
             repr(self.title))
 
     def get_absolute_url(self):
         return "/patch/%d" % self.id
 
-    def get_display_title(self):
+    def get_display_info(self):
         if not self.base_patch:
-            return "Published Code as of %s" % (self.created.strftime("%x"))
-        return self.title
+            return Patch.get_code_repository_commit_info(self.commit_hash)
+        return {
+            "title": self.title,
+            }
 
     def has_changes(self):
         return self.changed_files.count() > 0
@@ -51,43 +53,68 @@ class Patch(models.Model):
         return Repository(settings.CODE_REPOSITORY_PATH)
 
     @staticmethod
-    def get_master_head():
+    def get_code_repository_branch_head(branch_name=None):
+        from django.conf import settings
+        if not branch_name: branch_name = settings.CODE_REPOSITORY_MASTER_BRANCH
+        repo = Patch.get_code_repository()
+        branch = repo.lookup_branch(branch_name)
+        if not branch: raise ValueError("There is no %s branch in the git repository." % branch_name)
+        return branch.get_object() # it's a commit object
+
+    @staticmethod
+    def get_code_repository_commit_info(commit):
         from datetime import datetime
         import lxml.etree
-        from django.conf import settings
 
-        # Get the master branch's HEAD commit in the code repo.
         repo = Patch.get_code_repository()
-        branch = repo.lookup_branch(settings.CODE_REPOSITORY_MASTER_BRANCH)
-        if not branch: raise ValueError("There is no %s branch in the git repository." % settings.CODE_REPOSITORY_MASTER_BRANCH)
-        commit = branch.get_object()
 
-        # If a Patch object exists for that commit, return it.
-        try:
-            return Patch.objects.get(root_patch_hash = commit.hex)
-        except Patch.DoesNotExist:
-            pass
+        if isinstance(commit, str):
+            # convert hex string to commit object
+            commit = repo[commit]
 
-        # Get information about the Code at this commit from the index.xml fileself
+        # Get metadata about the Code at this commit from the index.xml fileself.
         dom = lxml.etree.fromstring(repo[commit.tree["index.xml"].oid].data)
+        recency = dom.find("meta/recency").text
 
-        # Build a descriptive title for the new Patch object.
-        title = \
+        commit_time = datetime.fromtimestamp(commit.commit_time)
+
+        title = "Published Code as of %s: %s" % (commit_time.strftime("%x"), recency.title())
+
+        # Build a title & description.
+        description = \
             dom.find("heading").text \
-            + "\n" + dom.find("meta/recency").text \
+            + "\n" + recency \
             + "\n\ncommit: " + commit.hex \
             + "\n(" + commit.message[0:50].strip() + ")"
 
+        return {
+            "commit": commit.hex,
+            "title": title,
+            "description": description,
+            "commit_time": commit_time,
+        }
+
+    @staticmethod
+    def get_master_head():
+        commit = Patch.get_code_repository_branch_head()
+        info = Patch.get_code_repository_commit_info(commit)
+
+        # If a Patch object exists for that commit, return it.
+        try:
+            return Patch.objects.get(commit_hash=info["commit"])
+        except Patch.DoesNotExist:
+            pass
+
         # Create a new Patch object.
         p = Patch(
-            title=title,
+            title=info["title"] + " | " + info["description"],
             base_patch=None,
-            root_patch_hash=commit.hex,
+            commit_hash=info["commit"],
             )
         p.save()
 
         # Override the creation/modified dates to reflect the commit date.
-        p.created = datetime.fromtimestamp(commit.commit_time)
+        p.created = info["commit_time"]
         p.modified = p.created
         p.save()
 
@@ -101,7 +128,7 @@ class Patch(models.Model):
             # Use git to list the files in the Code.
             entry_type_names = { 'Blob': 'file', 'Tree': 'dir'  }
             repo = Patch.get_code_repository()
-            commit = repo[self.root_patch_hash]
+            commit = repo[self.commit_hash]
             tree = commit.tree
             if path:
                 for entry in path.split("/"): # move down the path
@@ -125,7 +152,7 @@ class Patch(models.Model):
         if self.base_patch is None:
             # This patch represents the state of the Code repository at a particular commit.
             repo = Patch.get_code_repository()
-            commit = repo[self.root_patch_hash]
+            commit = repo[self.commit_hash]
             return repo[commit.tree[filename].oid].data
 
         else:

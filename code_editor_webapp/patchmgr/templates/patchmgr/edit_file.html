@@ -5,6 +5,9 @@
 {% block head %}
 <!-- Create a simple CodeMirror instance -->
 <link rel="stylesheet" href="/static/lib/codemirror.css">
+
+<!-- Redering CSS from simple-2 -->
+<link rel="stylesheet" href="/static/simple-2.css">
 {% endblock %}
 
 {% block body %}
@@ -152,7 +155,7 @@
 	  				if (res.status == "ok")
 				  		$('#editor_preview').html(res.html);
 				  	else
-				  		$('#editor_preview').text(res.msg);
+				  		$('#editor_preview').text(res.error);
 				  	$('#editor_preview a').each(function() {
 				  		this.setAttribute("target", "_blank")
 				  	})

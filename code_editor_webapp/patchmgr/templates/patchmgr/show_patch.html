@@ -5,7 +5,7 @@
 {% block body %}
 
 
-	<h1>{{patch.get_display_title}}</h1>
+	<h1>{{patch.title}}</h1>
 
 	{% if not patch.base_patch %}
 		<div style="margin-left: 2em; white-space: pre;">{{patch.title}}</div>
@@ -17,10 +17,6 @@
 			<p>This patch does not have any changes to the Code yet.</p>
 		{% endif %}
 
-	{% endif %}
-
-	{% if patch.can_create_subpatch %}
-		<p>Start a <a href="{{patch.get_absolute_url}}/_new">new patch</a> based on the text of the Code as it appears here?</p>
 	{% endif %}
 
 	{% if patch.can_modify %}
@@ -35,7 +31,7 @@
 		</ul>
 		{% endif %}
 
-		<p>Choose a file below to modify.</p>
+		<p>Choose a file below to modify it:</p>
 
 		<ul style="list-style: none">
 		{% if path %}
@@ -52,6 +48,11 @@
 		{% endfor %}
 		</ul>
 
+	{% endif %}
+
+	{% if patch.can_create_subpatch %}
+		<h2>Advanced</h2>
+		<p>Start a <a href="{{patch.get_absolute_url}}/_new">new patch</a> based on the text of the Code as it appears in this patch?</p>
 	{% endif %}
 
 {% endblock %}

@@ -4,16 +4,26 @@
 
 {% block body %}
 
+	<h1>Start a New Patch</h1>
 
-	<h1>Open a Code Patch</h1>
+	<p>Start a <a href="{{head.get_absolute_url}}/_new">new patch</a> based on the text of most recently published Code? The most recently published version is:</p>
+	<div style="margin-left: 2em; padding: .5em; background-color: #EEE;">
+		<p style="margin-top: 0; font-weight: bold;">{{head.get_display_info.title}}</p>
+		<p style="margin-bottom: 0; white-space: pre;">{{head.get_display_info.description}}</p>
+	</div>
 
-	{% for patch in patches %}
+	<h1>Patches In Progress</h1>
+
+	{% for patch in patch_list %}
 		<div>
-			<p><a href="{{patch.get_absolute_url}}">{{patch.get_display_title}}</a></p>
-			{% if not patch.base_patch %}
-				<div style="margin-left: 2em; white-space: pre;">{{patch.title}}</div>
-			{% endif %}
+			<p><a href="{{patch.get_absolute_url}}">{{patch.title}}</a></p>
+			<div style="margin-left: 2em;">
+				<div>Created: {{patch.created}}</div>
+				<div>Last Modified: {{patch.modified}}</div>
+			</div>
 		</div>
+	{% empty %}
+		<p>You do not have any patches in progress.</p>
 	{% endfor %}
 
 {% endblock %}
