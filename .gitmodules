@@ -10,3 +10,6 @@
 [submodule "ext/simple-2"]
 	path = ext/simple-2
 	url = https://github.com/openlawdc/simple-2
+[submodule "ext/bootstrap"]
+	path = ext/bootstrap
+	url = https://github.com/twbs/bootstrap

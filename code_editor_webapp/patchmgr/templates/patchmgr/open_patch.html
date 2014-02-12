@@ -3,27 +3,34 @@
 {% block title %}Open Patch{% endblock %}
 
 {% block body %}
+<div class="container">
+	<div class="row">
+		<div class="col-sm-6">
+			<h1>Start a New Patch</h1>
 
-	<h1>Start a New Patch</h1>
-
-	<p>Start a <a href="{{head.get_absolute_url}}/_new">new patch</a> based on the text of most recently published Code? The most recently published version is:</p>
-	<div style="margin-left: 2em; padding: .5em; background-color: #EEE;">
-		<p style="margin-top: 0; font-weight: bold;">{{head.get_display_info.title}}</p>
-		<p style="margin-bottom: 0; white-space: pre;">{{head.get_display_info.description}}</p>
-	</div>
-
-	<h1>Patches In Progress</h1>
-
-	{% for patch in patch_list %}
-		<div>
-			<p><a href="{{patch.get_absolute_url}}">{{patch.title}}</a></p>
-			<div style="margin-left: 2em;">
-				<div>Created: {{patch.created}}</div>
-				<div>Last Modified: {{patch.modified}}</div>
+			<p>Start a <a href="{{head.get_absolute_url}}/_new">new patch</a> based on the text of most recently published Code? The most recently published version is:</p>
+			<div style="margin-right: 2em; padding: .5em; background-color: #EEE;">
+				<p style="margin-top: 0; font-weight: bold;">{{head.get_display_info.title}}</p>
+				<p style="margin-bottom: 0; white-space: pre;">{{head.get_display_info.description}}</p>
 			</div>
 		</div>
-	{% empty %}
-		<p>You do not have any patches in progress.</p>
-	{% endfor %}
+
+		<div class="col-sm-6">
+			<h1>Patches In Progress</h1>
+
+			{% for patch in patch_list %}
+				<div>
+					<p><a href="{{patch.get_absolute_url}}">{{patch.title}}</a></p>
+					<div style="margin-left: 2em;">
+						<div>Created: {{patch.created}}</div>
+						<div>Last Modified: {{patch.modified}}</div>
+					</div>
+				</div>
+			{% empty %}
+				<p>You do not have any patches in progress.</p>
+			{% endfor %}
+		</div>
+	</div>
+</div>
 
 {% endblock %}

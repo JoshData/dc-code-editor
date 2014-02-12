@@ -11,23 +11,23 @@
 {% endblock %}
 
 {% block body %}
+<div class="container-fluid">
 
 	<p style="margin: 0">
-		<a href="{{patch.get_absolute_url}}">{{patch.get_display_title}}</a>
-		{% if change.title != change.filename %} &gt; {{change.filename}}{% endif %}
+		<a href="{{patch.get_absolute_url}}">&lt; {{patch.title}}</a>
+		{% if change.title != change.filename %} | {{change.filename}}{% endif %}
 	</p>
 	<h1 style="margin: 0">{{change.title}}</h1>
 
-	<div id="editor_two_panel">
-		<div id="save_status">&nbsp;</div>
-
-		<div id="editor_left_panel">
-			<h2>Edit Page</h2>
+	<div class="row">
+		<div class="col-sm-6">
+			<div id="save_status">&nbsp;</div>
+			<h2>Edit File</h2>
 
 			<textarea id="editor_textarea">{{current_text}}</textarea>
 		</div>
 
-		<div id="editor_right_panel">
+		<div class="col-sm-6">
 			<h2>Preview</h2>
 			<div id="editor_preview">
 			</div>
@@ -64,7 +64,7 @@
 	  var current_diff_markers = [];
 
 	  function on_change() {
-	  	$('#save_status').text("Not saved...");
+	  	$('#save_status').text("Not Saved").attr("class", "text-danger");
 
 	  	on_change_delayed_250_flag++;
 	  	on_change_delayed_2000_flag++;
@@ -133,7 +133,7 @@
 	  			method: "POST",
 	  			success: function(res) {
 	  				if (res.status == "ok")
-				  		$('#save_status').text("Saved.");
+				  		$('#save_status').text("Saved.").attr("class", "text-muted");
 				  	else
 				  		$('#save_status').text(res.msg);
 	  			},

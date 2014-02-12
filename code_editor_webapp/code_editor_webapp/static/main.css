@@ -1,11 +1,10 @@
 /* Text Editor */
 
-#editor_left_panel, #editor_right_panel {
-	width: 49%;
-	float: left;
-}
-	#editor_textarea {
-		width: 90%;
+	#save_status {
+		margin-top: 20px;
+		float: right;
+		width: 200px;
+		text-align: right;
 	}
 
 	.editor_text_modified {

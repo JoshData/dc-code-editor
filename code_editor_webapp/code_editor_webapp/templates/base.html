@@ -10,8 +10,10 @@
 
         <title>{% block title %}Code Editor{% endblock %}</title>
 
+        <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
         <link rel="stylesheet" href="/static/main.css">
-        <script src="/assets/modernizr-2.6.2-respond-1.1.0.min.js"></script>
+        <script src="/static/modernizr-2.6.2-respond-1.1.0.min.js"></script>
 
         {% block head %}
         {% endblock %}
@@ -21,9 +23,13 @@
             <p class="chromeframe">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">activate Google Chrome Frame</a> to improve your experience.</p>
         <![endif]-->
 
-        <header>
-          <p>DC Code Editor</p>
-        </header>
+        <div class="navbar navbar-inverse">
+          <div class="container">
+            <div class="navbar-header">
+              <a class="navbar-brand" href="/">DC Code Editor</a>
+            </div>
+          </div>
+        </div>
 
         {% block body %}
         {% endblock %}
@@ -31,7 +37,7 @@
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
         <script>$(document).ajaxSend(function(event, xhr, settings) { if (!/^https?:.*/.test(settings.url)) xhr.setRequestHeader("X-CSRFToken", "{{csrf_token}}"); });</script>
 
-
+        <script src="/static/bootstrap/js/bootstrap.min.js"></script>
         <script src="/static/main.js"></script>
 
         {% block scripts %}

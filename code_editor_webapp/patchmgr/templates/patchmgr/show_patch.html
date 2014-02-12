@@ -3,8 +3,7 @@
 {% block title %}{{patch.get_display_title}}{% endblock %}
 
 {% block body %}
-
-
+<div class="container">
 	<h1>{{patch.title}}</h1>
 
 	{% if not patch.base_patch %}
@@ -20,34 +19,41 @@
 	{% endif %}
 
 	{% if patch.can_modify %}
-		<h2>Modify a File</h2>
+	<div class="row">
+		<div class="col-sm-6">
+			<h2>Continue Editing</h2>
 
-		{% if patch.has_changes %}
-		<p>Continue editing...</p>
-		<ul>
-			{% for change in patch.changed_files.all %}
-				<li><a href="{{change.get_absolute_url}}">{{change.filename}}</a></li>
-			{% endfor %}
-		</ul>
-		{% endif %}
-
-		<p>Choose a file below to modify it:</p>
-
-		<ul style="list-style: none">
-		{% if path %}
-			<li>[<a href="{{patch.get_absolute_url}}?path={{path_up}}">&mdash; go up a level &mdash;</a>]</li>
-		{% endif %}
-		{% for filepath, filename, filetype in files %}
-		<li>
-			{% if filetype == "dir" %}
-				[<a href="{{patch.get_absolute_url}}?path={{filepath}}">{{filename}}</a>]
-			{% else %}
-				<a href="{{patch.get_absolute_url}}/_edit?file={{filepath}}">{{filename}}</a>
+			{% if patch.has_changes %}
+			<p>Continue editing...</p>
+			<ul style="list-style: none; padding: 0;">
+				{% for change in patch.changed_files.all %}
+					<li><a href="{{change.get_absolute_url}}">{{change.filename}}</a></li>
+				{% endfor %}
+			</ul>
 			{% endif %}
-		</li>
-		{% endfor %}
-		</ul>
+		</div>
 
+		<div class="col-sm-6">
+			<h2>Edit New File...</h2>
+
+			<p>Choose a file below to modify it:</p>
+
+			<ul style="list-style: none; padding: 0;">
+			{% if path %}
+				<li>[<a href="{{patch.get_absolute_url}}?path={{path_up}}">&mdash; go up a level &mdash;</a>]</li>
+			{% endif %}
+			{% for filepath, filename, filetype in files %}
+			<li>
+				{% if filetype == "dir" %}
+					[DIR] <a href="{{patch.get_absolute_url}}?path={{filepath}}">{{filename}}</a>
+				{% else %}
+					<a href="{{patch.get_absolute_url}}/_edit?file={{filepath}}">{{filename}}</a>
+				{% endif %}
+			</li>
+			{% endfor %}
+			</ul>
+		</div>
+	</div>
 	{% endif %}
 
 	{% if patch.can_create_subpatch %}
