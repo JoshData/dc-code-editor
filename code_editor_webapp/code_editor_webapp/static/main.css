@@ -1,5 +1,16 @@
 /* Text Editor */
 
+@import url(http://fonts.googleapis.com/css?family=Fenix);
+
+.CodeMirror {
+	font-size: 19px !important;
+	line-height: 25px !important;
+	font-family: Fenix, 'Times New Roman' !important;
+}
+	.CodeMirror-code > * {
+		padding-bottom: .33em;
+	}
+
 	#save_status {
 		margin-top: 20px;
 		float: right;
