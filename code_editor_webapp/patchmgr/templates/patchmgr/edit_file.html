@@ -4,7 +4,7 @@
 
 {% block head %}
 <!-- Create a simple CodeMirror instance -->
-<link rel="stylesheet" href="/static/lib/codemirror.css">
+<link rel="stylesheet" href="/static/lib/codemirror/lib/codemirror.css">
 
 <!-- Redering CSS from simple-2 -->
 <link rel="stylesheet" href="/static/simple-2.css">
@@ -36,8 +36,9 @@
 {% endblock %}
 
 {% block scripts %}
-	<script src="/static/lib/codemirror.js"></script>
-	<script src="/static/lib/codemirror_mode_xml.js"></script>
+	<script src="/static/lib/codemirror/lib/codemirror.js"></script>
+	<script src="/static/lib/codemirror/mode/xml/xml.js"></script>
+	<script src="/static/lib/codemirror/addon/edit/closetag.js"></script>
 	<script src="/static/lib/google-diff-match-patch.js"></script>
 
 	<script>
@@ -49,7 +50,8 @@
 	    mode: "text/xml",
 	    lineWrapping: true,
 	    autofocus: true,
-	    lineNumbers: true
+	    lineNumbers: true,
+	    autoCloseTags: true
 	  });
 	  editor.setSize("100%", "100%");
 	  editor.on('change', on_change);
