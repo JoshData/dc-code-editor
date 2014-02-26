@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}DC Code Editor{% endblock %}
+
+{% block body %}
+<div class="container">
+	<h1>Start a New Patch</h1>
+
+	<p>Start a <a href="{{patch_list[0].edit_url}}/_new">new patch</a> based on the text of the top-most patch.</p>
+
+	<h1>Timeline</h1>
+
+	{% for patch in patch_list %}
+		<div style="margin-bottom: 2em">
+			<p><a href="{{patch.edit_url}}">{{patch.title}}</a></p>
+			<div style="margin-left: 2em;">
+				<div>Created: {{patch.created_formatted}}</div>
+			</div>
+		</div>
+	{% endfor %}
+</div>
+
+{% endblock %}

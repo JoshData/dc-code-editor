@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}{{filename}} -- {{patch.title}}{% endblock %}
+
+{% block head %}
+<!-- Create a simple CodeMirror instance -->
+<link rel="stylesheet" href="/static/codemirror/lib/codemirror.css">
+
+<!-- Redering CSS from simple-2 -->
+<link rel="stylesheet" href="/static/simple-2.css">
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+
+	<p style="margin: 0">
+		<a href="{{patch.edit_url}}">&lt; {{patch.title}}</a>
+	</p>
+	<h1 style="margin: 0">{{filename}}</h1>
+
+	<div class="row">
+		<div class="col-sm-6">
+			<div id="save_status">&nbsp;</div>
+			<h2>Edit File</h2>
+
+			<textarea id="editor_textarea" style="display: none">{{current_text}}</textarea>
+		</div>
+
+		<div class="col-sm-6">
+			<h2>Preview</h2>
+			<div id="editor_preview">
+			</div>
+		</div>
+	</div>
+{% endblock %}
+
+{% block scripts %}
+	<script src="/static/codemirror/lib/codemirror.js"></script>
+	<script src="/static/codemirror/mode/xml/xml.js"></script>
+	<script src="/static/codemirror/addon/edit/closetag.js"></script>
+	<script src="/static/diff_match_patch.js"></script>
+
+	<script>
+	  var base_text = {{base_text|safe}};
+	  var dmp = new diff_match_patch();
+	  dmp.Diff_Timeout = .075; // otherwise the computation can be slow and interfere with the UI
+
+	  var editor = CodeMirror.fromTextArea($("#editor_textarea")[0], {
+	    mode: "text/xml",
+	    lineWrapping: true,
+	    autofocus: true,
+	    lineNumbers: true,
+	    autoCloseTags: true
+	  });
+	  editor.setSize("100%", "100%");
+	  editor.on('change', on_change);
+	  $(function() {
+	  	// things to do on initialization
+	  	update_diff();
+	  	update_preview()
+	  });
+
+	  // Utility code to fire a delayed event but if the event is fired
+	  // successively before the callback is executed, only execute the
+	  // callback once on the last-initiated delay.
+	  var delayed_event_flags = { };
+	  function fire_delayed_event(name, delay) {
+	  	if (!(name in delayed_event_flags)) delayed_event_flags[name] = 0;
+	  	delayed_event_flags[name]++;
+	  	var v = "delayed_event_flags['" + name + "']";
+	  	setTimeout(v + "--; if (" + v + " == 0) " + name + '()', delay);
+	  }
+
+	  var has_unsaved_changes = false;
+	  function on_change() {
+	  	$('#save_status').text("Not Saved").attr("class", "text-danger");
+	  	has_unsaved_changes = true;
+
+	  	fire_delayed_event('on_change_delayed_250', 250);
+	  	fire_delayed_event('on_change_delayed_2000', 2000);
+	  }
+
+  	window.onbeforeunload = function() { 
+  	  if (has_unsaved_changes)
+  	    return "Hang on, I haven't saved your changes just yet.";
+  	}
+
+	  function on_change_delayed_250() {
+	  	update_diff();
+	  	update_preview();
+	  }
+
+	  var current_diff_markers = [];
+	  function update_diff() {
+	  	// Uses text marks in the code editor to show text that was modified or inserted.
+
+	  	// clear any markers we set last time around
+	  	for (var i = 0; i < current_diff_markers.length; i++) current_diff_markers[i].clear();
+
+	  	// track our position, and a utility function using a closure to add a marker
+	  	var line_no = 0;
+	  	var col_no = 0;
+	  	var prev_pos = {line: 0, ch: 0};
+	  	function mark_text(through_pos, className, is_deletion, replaced_text) {
+	  		var m;
+	  		if (!is_deletion) {
+		  		m = editor.markText(prev_pos, through_pos, { className: className })
+		  	} else {
+		  		m = editor.setBookmark(through_pos, { widget: $("<span class='editor_text_deleted'> </span>").text(replaced_text)[0] })
+		  	}
+	  		current_diff_markers.push(m);
+	  		prev_pos = through_pos;
+	  	}
+
+	  	// use Google Diff Match Patch to compare the old and new text
+	  	var diff = dmp.diff_main(base_text, editor.getValue(), true);
+	  	for (var i = 0; i < diff.length; i++) {
+	  		var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_modified" : "";
+	  		if (!diff[i][1].match(/\S/) || (i > 0 && i < diff.length-1 && diff[i][1].length < (diff[i-1][1].length+diff[i+1][1].length)/2)) {
+	  			// if a DIFF_EQUAL hunk is just whitespace or very short, display it as if it is
+	  			// a modification since it is probably a part of the same logical change as
+	  			// the hunks around it.
+	  			className = "editor_text_modified";
+	  		}
+
+	  		if (diff[i][0] != DIFF_DELETE) {
+		  		for (var c = 0; c < diff[i][1].length; c++) {
+		  			col_no++;
+		  			if (diff[i][1].charAt(c) == '\n') {
+		  				mark_text({line: line_no, ch: col_no}, className);
+		  				line_no++;
+		  				col_no = 0;
+		  			}
+		  		}
+		  	}
+
+		  	var replaced_text = diff[i][1];
+			mark_text({line: line_no, ch: col_no}, className, diff[i][0] == DIFF_DELETE, replaced_text);
+	  	}
+	  }
+
+	  function on_change_delayed_2000() {
+	  	save_document();
+	  }
+
+	  function save_document() {
+	  	$.ajax(
+	  		"/save-patch-file",
+	  		{
+	  			data: {
+	  				patch: "{{patch.id}}",
+	  				file: "{{filename}}",
+	  				text: editor.getValue()
+	  			},
+	  			method: "POST",
+	  			success: function(res) {
+	  				if (res.status == "ok") {
+				  		$('#save_status').text("Saved.").attr("class", "text-muted");
+				  		has_unsaved_changes = false;
+	  				} else {
+				  		$('#save_status').text(res.msg);
+	  				}
+	  			},
+	  			error: function() {
+				  	$('#save_status').text("Error saving changes.");
+	  			},
+	  		});
+	  }
+
+	  function update_preview() {
+	  	$.ajax(
+	  		"/render-body",
+	  		{
+	  			data: {
+	  				text: editor.getValue()
+	  			},
+	  			method: "POST",
+	  			success: function(res) {
+	  				if (res.status == "ok")
+				  		$('#editor_preview').html(res.html);
+				  	else
+				  		$('#editor_preview').text(res.error);
+				  	$('#editor_preview a').each(function() {
+				  		this.setAttribute("target", "_blank")
+				  	})
+	  			},
+	  			error: function() {
+				  	$('#editor_preview').text("Error creating the preview.");
+	  			},
+	  		});
+	  }
+
+	</script>
+
+{% endblock %}

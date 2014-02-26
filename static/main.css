@@ -1,0 +1,36 @@
+/* Text Editor */
+
+@import url(http://fonts.googleapis.com/css?family=Fenix);
+
+.CodeMirror {
+	font-size: 19px !important;
+	line-height: 25px !important;
+	font-family: Fenix, 'Times New Roman' !important;
+}
+	.CodeMirror-code > * {
+		padding-bottom: .33em;
+	}
+
+	#save_status {
+		margin-top: 20px;
+		float: right;
+		width: 200px;
+		text-align: right;
+	}
+
+	.editor_text_modified {
+		background-color: #FEE;
+		font-weight: bold;
+	}
+
+	.editor_text_deleted {
+		background-color: #FEE;
+		color: #888;
+		text-decoration: line-through;
+	}
+
+	#editor_preview {
+		background-color: #FAFAFA;
+		min-height: 1000px;
+	}
+

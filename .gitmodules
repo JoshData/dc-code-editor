@@ -1,0 +1,12 @@
+[submodule "ext/codemirror"]
+	path = ext/codemirror
+	url = https://github.com/marijnh/CodeMirror.git
+[submodule "ext/google-diff-match-patch"]
+	path = ext/google-diff-match-patch
+	url = https://github.com/lqc/google-diff-match-patch/
+[submodule "ext/simple-2"]
+	path = ext/simple-2
+	url = https://github.com/openlawdc/simple-2
+[submodule "ext/bootstrap"]
+	path = ext/bootstrap
+	url = https://github.com/twbs/bootstrap

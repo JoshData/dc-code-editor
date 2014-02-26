@@ -1,0 +1,25 @@
+{
+  "name": "legal-code-editor",
+  "version": "0.0.0",
+  "description": "A web application, to be run locally, to edit legal codes maintained in the style of the District of Columbia Cranch Project.",
+  "main": "editor/index.js",
+  "scripts": {
+  },
+  "keywords": [
+    "dc",
+    "law",
+    "code",
+    "editor"
+  ],
+  "author": "Council of the District of Columbia, Office of the General Counsel",
+  "license": "Public Domain",
+  "dependencies": {
+    "glob": "~3.2.8",
+    "elementtree": "~0.1.5",
+    "express": "3.4.8",
+    "swig": "1.3.2",
+    "clone": "0.1.11",
+    "node-uuid": "~1.4.1",
+    "async": "~0.2.10"
+  }
+}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}{{patch.get_display_title}}{% endblock %}
+
+{% block body %}
+<div class="container">
+	<p id="patch_actions" style="font-size: 80%; color: #444; margin: 0;">
+		<span>rename</span>
+		|
+		<span>delete</span>
+	</p>
+	<h1 style="margin-top: 0">{{patch.title}}</h1>
+
+	{% if patch.can_modify %}
+	<div class="row">
+		{% if patch.has_changes %}
+		<div class="col-sm-6">
+			<h2>Continue Editing...</h2>
+
+			<ul style="list-style: none; padding: 0;">
+				{% for change in patch.changed_files.all %}
+					<li><a href="{{change.get_absolute_url}}">{{change.filename}}</a></li>
+				{% endfor %}
+			</ul>
+
+		</div>
+		{% endif %}
+
+		<div class="col-sm-6">
+			<h2>Edit {% if patch.has_changes %}New{% endif %} File...</h2>
+
+			<p>Choose a file below to modify it:</p>
+
+			<ul style="list-style: none; padding: 0;">
+			{% if path_up %}
+				<li>[<a href="{{patch.edit_url}}{% if path_up != "." %}?path={{path_up}}{% endif %}">&mdash; go up a level &mdash;</a>]</li>
+			{% endif %}
+			{% for entry in files %}
+			<li>
+				{% if entry.type == "tree" %}
+					[DIR] <a href="{{patch.edit_url}}?path={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>
+				{% else %}
+					<a href="{{patch.edit_url}}/editor?file={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>
+				{% endif %}
+			</li>
+			{% endfor %}
+			</ul>
+		</div>
+	</div>
+	{% endif %}
+
+	<!--
+	<h2>New Patch</h2>
+	<p>Start a <a href="{{patch.edit_url}}/_new">new patch</a> based on the text of the Code as it appears in this patch?</p>
+	-->
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+	$(function() {
+		$('#patch_actions span').css({cursor: "pointer"}).click(function() {
+			patch_action($(this).text());
+		});
+	});
+
+	function patch_action(action) {
+		var value;
+		if (action == "rename") {
+			var elem = $('h1');
+			value = prompt("Rename this patch?", elem.text());
+			if (!value) return;
+		}
+
+	  	$.ajax(
+	  		"{{patch.edit_url}}/_action",
+	  		{
+	  			data: {
+	  				action: action,
+	  				value: value
+	  			},
+	  			method: "POST",
+	  			success: function(res) {
+	  				if (res.status == "ok")
+	  					window.location = res.redirect;
+	  				else
+	  					show_modal_error(action, res.msg);
+	  			},
+	  			error: function() {
+				  	show_modal_error(action, "There was an error, sorry.");
+	  			}
+	  		});
+	}
+
+</script>
+{% endblock %}
