@@ -65,10 +65,58 @@ function getAllPatchIds(callback) {
 }
 
 exports.getTree = function(callback) {
-	getAllPatchIds(function(file_list) {
-		callback(file_list.map(function(item) {
-			return Patch.load(item);
-		}));
+	/* Computes a data structure for showing all of
+	   the patches as a tree. */
+	getAllPatchIds(function(patch_ids) {
+		// load up every Patch instance
+		var patches = patch_ids.map(function(item) { return Patch.load(item); });
+
+		// make a UUID map
+		var uuid_map = { };
+		for (var i in patches)
+			uuid_map[patches[i].uuid] = patches[i];
+
+		// find the root patch
+		var root = null;
+		for (var i in patches)
+			if (patches[i].type == "root")
+				root = { obj: patches[i], depth: 0, children: [] };
+
+		// recursively add the children, at each child compute
+		// the 'depth' which is the maximum depth of any subtree
+		// from the child, and sort the children from greatest
+		// depth to least depth.
+		function add_children(rec) {
+			for (var i in rec.obj.children) {
+				var child = { obj: uuid_map[rec.obj.children[i]], depth: 0, children: [] };
+				rec.children.push(child);
+				add_children(child);
+				if (child.depth + 1 > rec.depth) rec.depth = child.depth+1;
+			}
+			rec.children.sort(function(a,b) { a.depth-b.depth });
+		}
+		add_children(root);
+
+		// serialize the tree into an array of rows, where each row
+		// is an array of patches to display in columns
+		var rows = [[root]];
+		while (true) {
+			var next_row = [];
+			var row = rows[rows.length-1];
+			row.forEach(function(rec, ri) {
+				rec.children.forEach(function(child, ci) {
+					if (ri == 0 && row.length == 1 && ci > 0)
+						row.push(child);
+					else
+						next_row.push(child);
+				})
+			})
+			if (next_row.length == 0) break;
+			rows.push(next_row);
+		}
+
+		rows.reverse();
+		callback(rows);
 	});
 };
 
@@ -96,19 +144,20 @@ Patch.prototype.createChild = function() {
 		ctr++;
 	}
 
-	// Update the base to note that this is a child.
-	// Unfortunately this creates redundant information, but it allows us to avoid
-	// scanning the whole workspace directory to find the children of each patch.
-	this.children.push(new_id);
-	this.save();
-
 	// Create the new patch.
-	var patch = new Patch({
+	var patch = new_patch_internal(new Patch({
 		"id": new_id,
 		"type": "patch",
 		"base": this.uuid,
-	});
-	return new_patch_internal(patch);
+	}));
+
+	// Update the base to note that this is a child.
+	// Unfortunately this creates redundant information, but it allows us to avoid
+	// scanning the whole workspace directory to find the children of each patch.
+	this.children.push(patch.uuid);
+	this.save();
+
+	return patch;
 }
 
 Patch.prototype.save = function() {

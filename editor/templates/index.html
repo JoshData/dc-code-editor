@@ -6,18 +6,27 @@
 <div class="container">
 	<h1>Start a New Patch</h1>
 
-	<p>Start a <a href="{{patch_list[0].edit_url}}/_new">new patch</a> based on the text of the top-most patch.</p>
+	<p>Start a <a href="{{head_patch.edit_url}}/_new">new patch</a> based on the text of the top-most patch.</p>
 
 	<h1>Timeline</h1>
 
-	{% for patch in patch_list %}
-		<div style="margin-bottom: 2em">
-			<p><a href="{{patch.edit_url}}">{{patch.title}}</a></p>
-			<div style="margin-left: 2em;">
-				<div>Created: {{patch.created_formatted}}</div>
-			</div>
+	<div id="timeline">
+	{% for row in patch_tree_rows %}
+		<div class="timeline-row">
+			{% for rec in row %}
+				<div class="timeline-patch">
+					<div class="timeline-patch-anchor"><a href="{{rec.obj.edit_url}}">{{rec.obj.title}}</a></div>
+					<div class="timeline-patch-metadata">
+						<div>Created: {{rec.obj.created_formatted}}</div>
+						{% if rec.obj.type != "root" and rec.obj.children.length %}
+							<div><a href="{{rec.obj.edit_url}}/_new">Modify</a></div>
+						{% endif %}
+					</div>
+				</div>
+			{% endfor %}
 		</div>
 	{% endfor %}
+	</div>
 </div>
 
 {% endblock %}

@@ -10,8 +10,11 @@ exports.set_routes = function(app) {
 	var home_template = swig.compileFile(__dirname + '/templates/index.html');
 	app.get('/', function(req, res){
 		res.setHeader('Content-Type', 'text/html');
-		patches.getTree(function(patch_list) {
-			res.send(home_template({ patch_list: patch_list }));
+		patches.getTree(function(patch_tree) {
+			res.send(home_template({
+				patch_tree_rows: patch_tree,
+				head_patch: patch_tree[0][0].obj
+			}));
 		});
 	});
 

@@ -1,4 +1,18 @@
-/* Text Editor */
+/* Home */
+
+#timeline .timeline-row {
+	clear: both;
+}
+#timeline .timeline-patch {
+	width: 250px;
+	float: left;
+	margin: 0 20px 20px 0;
+}
+#timeline .timeline-patch-metadata {
+	font-size: 90%;
+}
+
+/* Patch View */
 
 #diffs > .diff {
 	white-space: pre-wrap;
@@ -18,6 +32,8 @@
 		color: #888;
 		text-decoration: line-through;
 	}
+
+/* Text Editor */
 
 .CodeMirror, #editor_preview {
 	font-size: 18px !important;
