@@ -9,25 +9,31 @@ var jsdiff = require('diff');
 var repo = require("./repository.js");
 var settings = require("./settings.js");
 
-exports.get_patch_tree = function(callback) {
-	get_patch_filenames(function(file_list) {
-		callback(file_list.map(function(item) {
-			return exports.load_patch(item);
-		}));
-	});
-};
+/*
+ * Class declaration for a Patch instance.
+ * This should only be called by internal functions in this
+ * module. Pass an Object of initial properties to set on the Patch.
+ */
+exports.Patch = function(initial_properties) {
+	// copy initial properties from initial_properties
+	for (var key in initial_properties)
+		this[key] = initial_properties[key];
+}
 
-function get_patch_filenames(callback) {
-	// Scan the workspace_directory for patches and assemble a tree.
-	try {
-		fs.mkdirSync(settings.workspace_directory)
-	} catch (e) {
-		// ignore if it exists
-		if (e.code != "EEXIST") throw e;
-	}
+// alias for this module
+Patch = exports.Patch;
 
+/*
+ * Methods.
+ */
+
+function getAllPatchIds(callback) {
+	/* Scan the workspace_directory for the IDs of all patches
+	   and return them asynchronously: callback(array_of_patch_ids). */
+
+	// Use glob to find all of the patch index.json files,
+	// and then return the list of directory names.
 	var patch_index_files = glob.sync(settings.workspace_directory + "/*/index.json");
-
 	if (patch_index_files.length > 0) {
 		callback(patch_index_files.map(function(item) {
 			return path.basename(path.dirname(item));
@@ -35,31 +41,51 @@ function get_patch_filenames(callback) {
 		return;
 	}
 
-	// On the first run, create a "root patch" that represents the state of the
+	// If there are no patches, this is probably the first run.
+
+	// Try to make the workspace directory if it doesn't exist.
+	try {
+		fs.mkdirSync(settings.workspace_directory)
+	} catch (e) {
+		// ignore if it exists
+		if (e.code != "EEXIST") throw e;
+	}
+
+	// Create a "root patch" that represents the state of the
 	// code as of what's given in the base code directory.
 	repo.get_repository_head(function(hash) {
-		create_patch_internal(
-		{
+		new_patch_internal(new Patch({
 			"id": "root",
 			"type": "root",
 			"hash": hash,
-		});
+		}));
 		callback(["root"]);
 	});
 	
 }
 
-function create_patch_internal(patch) {
+exports.getTree = function(callback) {
+	getAllPatchIds(function(file_list) {
+		callback(file_list.map(function(item) {
+			return Patch.load(item);
+		}));
+	});
+};
+
+function new_patch_internal(patch) {
 	// fill in additional data
 	patch.uuid = uuid.v4();
 	patch.created = new Date();
 	patch.files = { }; // the actual changes w/in this patch
 	patch.children = [ ]; // UUIDs of children whose base patch is this patch
-	write_patch(patch);
-	return exports.load_patch(patch.id);
+	patch.save();
+	return Patch.load(patch.id);
 }
 
-exports.create_patch_from = function(base_patch) {
+Patch.prototype.createChild = function() {
+	/* Creates a new Patch that continues from this patch, its base_patch.
+	   Returns the new Patch instance immediately. */
+
 	// Get an ID that is not in use.
 	var new_id;
 	var ctr = 0;
@@ -73,21 +99,23 @@ exports.create_patch_from = function(base_patch) {
 	// Update the base to note that this is a child.
 	// Unfortunately this creates redundant information, but it allows us to avoid
 	// scanning the whole workspace directory to find the children of each patch.
-	base_patch.children.push(new_id);
-	write_patch(base_patch);
+	this.children.push(new_id);
+	this.save();
 
 	// Create the new patch.
-	var patch = {
+	var patch = new Patch({
 		"id": new_id,
 		"type": "patch",
-		"base": base_patch.uuid,
-	}; 
-	return create_patch_internal(patch);
+		"base": this.uuid,
+	});
+	return new_patch_internal(patch);
 }
 
-function write_patch(patch_obj) {
+Patch.prototype.save = function() {
+	/* Writes the Patch metadata to disk. */
+
 	// clone before modifying
-	patch_obj = clone(patch_obj);
+	patch_obj = clone(this);
 
 	// remove the 'id' from the object before writing so it is not redunctant with the directory name
 	var patch_name = patch_obj.id;
@@ -110,13 +138,16 @@ function write_patch(patch_obj) {
 	patch_id_cache[patch_obj.uuid] = patch_obj.id;
 }
 
-exports.load_patch = function(patch_name) {
-	var patch = JSON.parse(fs.readFileSync(settings.workspace_directory + "/" + patch_name + "/index.json"));
+Patch.load = function(patch_id) {
+	/* Loads a Patch instance by the Patch's ID (i.e. the directory name). */
+
+	var patch_data = JSON.parse(fs.readFileSync(settings.workspace_directory + "/" + patch_id + "/index.json"));
+	var patch = new Patch(patch_data);
 
 	// fill in some things
-	patch.id = patch_name;
-	patch.title = patch_name; // maybe override this later
-	patch.edit_url = "/patch/" + patch_name;
+	patch.id = patch_id;
+	patch.title = patch_id; // maybe override this later
+	patch.edit_url = "/patch/" + patch_id;
 	if (patch.type != "root") patch.can_modify = true;
 
 	// parse some fields
@@ -127,13 +158,17 @@ exports.load_patch = function(patch_name) {
 }
 
 patch_id_cache = { };
-function load_patch_from_uuid(uuid, callback) {
+Patch.loadByUUID = function(uuid, callback) {
+	/* Asynchronously load a patch given its UUID.
+	   Returns the Patch instance via the callback: callback(patch_instance).
+	   */
+
 	// Try to load the patch named in the cache. Double check that it
 	// has the right UUID stored. If not, ignore what the cache says
 	// and scan the whole directory to find the cache.
 	if (uuid in patch_id_cache) {
 		try {
-			var p = exports.load_patch(patch_id_cache[uuid]);
+			var p = Patch.load(patch_id_cache[uuid]);
 			if (p.uuid == uuid) {
 				callback(p);
 				return;
@@ -144,11 +179,11 @@ function load_patch_from_uuid(uuid, callback) {
 		delete patch_id_cache[uuid];
 	}
 
-	get_patch_filenames(function(entries) {
+	getAllPatchIds(function(entries) {
 		entries.some(function(entry){
-			var p = exports.load_patch(entry);
+			var p = Patch.load(entry);
+			patch_id_cache[p.uuid] = p.id;
 			if (p.uuid == uuid) {
-				patch_id_cache[uuid] = p.id;
 				callback(p);
 				return true; // end loop
 			}
@@ -157,43 +192,61 @@ function load_patch_from_uuid(uuid, callback) {
 	});
 }
 
-exports.get_file_list = function(patch, path, with_deleted_files, callback) {
-	// Get a list of files that exist after this patch is applied.
-	// If with_deleted_files, then we include files deleted by this patch.
-	if (patch.type == "root") {
+Patch.prototype.getBase = function(callback) {
+	/* Gets the base patch (asynchronously). */
+	Patch.loadByUUID(this.base, callback);
+}
+
+Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
+	/* Get a list of files that exist after this patch is applied in
+	   the directory named path (or null for the root path). Only
+	   immediate child paths are returned.
+
+	   If with_deleted_files, then we include files deleted by this patch.
+	   */
+
+	if (this.type == "root") {
 		// Go to the repository to get the files in the indicated path.
 		repo.ls(null, path, callback);
 	} else {
 		// Get the files in the base patch, never including files
 		// deleted in the base patch.
-		load_patch_from_uuid(patch.base, function(base) {
-			exports.get_file_list(base, path, false, function(entries) {
+		this.getBase(function(base) {
+			base.getPaths(path, false, function(entries) {
 				// TODO: Modify according to the added and removed files in
 				// this patch.
 				callback(entries);
 			})
-		})
+		});
 	}
 }
 
-exports.get_patch_file_content = function(patch, path, with_base_content, callback) {
-	if (patch.type == "root") {
+Patch.prototype.getPathContent = function(path, with_base_content, callback) {
+	/* Gets the content of a path after this patch is applied, and if
+	   with_base_content is true then we also provide the base content,
+	   i.e. the content prior to this patch.
+
+	   The content is returned asynchronously: callback(base_content, new_content).
+	   */
+
+	if (this.type == "root") {
 		// Go to the repository to get the files in the indicated path.
 		if (with_base_content) throw "Cannot set with_base_content=true on a root patch.";
 		repo.cat(null, path, function(blob) { callback(null, blob); } );
 	} else {
-		var dirname = settings.workspace_directory + "/" + patch.id;
+		var dirname = settings.workspace_directory + "/" + this.id;
 
-		if ((path in patch.files) && patch.files[path].method == "raw" && !with_base_content) {
+		if ((path in this.files) && this.files[path].method == "raw" && !with_base_content) {
 			// If the entire new content is stored raw, and the caller doesn't need
 			// the base content, just load the file and return.
-			fs.readFile(dirname + "/" + patch.files[path].storage, { encoding: "utf8" }, function(err, data) { if (err) throw err; callback(null, data); });
+			fs.readFile(dirname + "/" + this.files[path].storage, { encoding: "utf8" }, function(err, data) { if (err) throw err; callback(null, data); });
 			return;
 		}
 
 		// Ask the base revision for its current content. We don't need *its* base.
-		load_patch_from_uuid(patch.base, function(base) {
-			exports.get_patch_file_content(base, path, false, function(dummy, base_content) {
+		var patch = this;
+		this.getBase(function(base) {
+			base.getPathContent(path, false, function(dummy, base_content) {
 				if (path in patch.files) {
 					// This file is modified by the patch.
 					if (patch.files[path].method == "raw") {
@@ -209,27 +262,45 @@ exports.get_patch_file_content = function(patch, path, with_base_content, callba
 	}
 }
 
-exports.write_changed_file = function(patch, filename, new_content) {
+Patch.prototype.writePathContent = function(path, new_content) {
+	/* Writes to disk the new content for a path modified
+	   by this patch. */
+
   	var needs_save = false;
 
-	if (!(filename in patch.files)) {
+	if (!(path in this.files)) {
 		// How should we store the changes on disk?
-		patch.files[filename] = {
-			storage: filename.replace(/\//g, "_"),
+		this.files[path] = {
+			storage: path.replace(/\//g, "_"),
 			method: "raw"
 		};
 		needs_save = true;
 	}
 
 	fs.writeFileSync(
-		settings.workspace_directory + "/" + patch.id + "/" + patch.files[filename].storage,
+		settings.workspace_directory + "/" + this.id + "/" + this.files[path].storage,
 		new_content);
 
 	if (needs_save)
-		write_patch(patch);
+		this.save();
 }
 
-exports.rename_patch = function(patch, new_id, callback) {
+Patch.prototype.rename = function(new_id, callback) {
+	/* Rename the patch, asynchronously. The patch object should
+	   not be used after a call to this method.
+	   On success, the callback is called with null as the first
+	   argument (no error) and a new Patch instance in the second
+	   argument.
+	   On failure, the callback is called with an error message in
+	   the first argument. */
+
+	// If new_id is already the ID of the patch, pretend like
+	// we did the rename.
+	if (this.id == new_id) {
+		callback(null, this);
+		return;
+	}
+
 	// Attempt to rename the directory on disk. Since patches reference
 	// other patches by their UUID, which is not changed by this operation,
 	// we don't have to worry about broken references.
@@ -249,22 +320,27 @@ exports.rename_patch = function(patch, new_id, callback) {
 
 	// Attempt rename.
 	fs.rename(
-		settings.workspace_directory + "/" + patch.id,
+		settings.workspace_directory + "/" + this.id,
 		settings.workspace_directory + "/" + new_id,
 		function(err) {
 			if (!err)
-				callback(null, exports.load_patch(new_id));
+				callback(null, Patch.load(new_id));
 			else
 				callback(""+err);
 		});
 }
 
-exports.delete_patch = function(patch, callback) {
-	// Delete a patch, but only if the patch doesn't actually make any changes.
+Patch.prototype.delete = function(callback) {
+	/* Delete a patch, but only if the patch doesn't actually make any changes.
+
+	   If the patch has child patches, revise their base to be the base of this patch.
+	   */
+
+	var patch = this;
 
 	// A root patch can't be deleted if there are patches that referecne it because
 	// we can't re-assign their base patch to nothing.
-	if (patch.children.length > 0 && patch.type == "root") {
+	if (this.children.length > 0 && this.type == "root") {
 		callback("A root patch cannot be deleted when there are patches applied after it.");
 		return;
 	}
@@ -278,7 +354,7 @@ exports.delete_patch = function(patch, callback) {
 		Object.keys(patch.files).map(function(path) {
 			return function(callback) {
 				// get the base and revised content of the modified file
-				exports.get_patch_file_content(patch, path, true,
+				patch.getPathContent(path, true,
 					function(base_content, new_content) {
 						// check if the content has been modified and call the async.parallel
 						// callback method with null for the error argument and...
@@ -310,10 +386,10 @@ exports.delete_patch = function(patch, callback) {
 				patch.children.map(function(child_uuid) {
 					return function(callback) {
 						// the function asyncronously loads the child patch by its UUID
-						load_patch_from_uuid(child_uuid, function(child_patch) {
+						Patch.loadByUUID(child_uuid, function(child_patch) {
 							// and then updates the child...
 							child_patch.base = patch.base;
-							write_patch(child_patch);
+							child_patch.save();
 
 							// and finally signals that this work is done.
 							callback();
@@ -329,9 +405,9 @@ exports.delete_patch = function(patch, callback) {
 						callback();
 						return;
 					}
-					load_patch_from_uuid(patch.base, function(base_patch) {
+					patch.getBase(function(base_patch) {
 						base_patch.children = base_patch.children.filter(function(child_uuid) { child_uuid != patch.uuid });
-						write_patch(base_patch);
+						base_patch.save();
 						callback();
 					});
 				}
@@ -421,15 +497,16 @@ function simplify_diff(diff) {
 	return new_diff;
 }
 
-exports.get_patch_diff = function(patch, callback) {
+Patch.prototype.getDiff = function(callback) {
 	// Computes a list of objects that have 'path' and 'diff'
 	// attributes representing the changes made by this patch.
+	var patch = this;
 	async.parallel(
 		// map the changed paths to functions that compute
 		// the unified diff on the changed path
 		Object.keys(patch.files).map(function(changed_path) {
 			return function(callback2) {
-				exports.get_patch_file_content(patch, changed_path, true, function(base_content, current_content) {
+				patch.getPathContent(changed_path, true, function(base_content, current_content) {
 					var diff = jsdiff.diffWords(base_content, current_content);
 					diff = simplify_diff(diff);
 					callback2(null, { path: changed_path, diff: diff }) // null=no error

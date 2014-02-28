@@ -10,7 +10,7 @@ exports.set_routes = function(app) {
 	var home_template = swig.compileFile(__dirname + '/templates/index.html');
 	app.get('/', function(req, res){
 		res.setHeader('Content-Type', 'text/html');
-		patches.get_patch_tree(function(patch_list) {
+		patches.getTree(function(patch_list) {
 			res.send(home_template({ patch_list: patch_list }));
 		});
 	});
@@ -20,21 +20,21 @@ exports.set_routes = function(app) {
 	app.get('/patch/:patch', function(req, res){
 		res.setHeader('Content-Type', 'text/html');
 
-		var patch = patches.load_patch(req.params.patch);
+		var patch = patches.Patch.load(req.params.patch);
 
 		async.parallel(
 		{
 			// get the list of editable files
 			file_list: function(callback) {
-				patches.get_file_list(
-					patch, req.query.path, true,
+				patch.getPaths(
+					req.query.path, true,
 					function(file_list) {
 						callback(null, file_list); // null=no error
 					});
 				},
 
 			// get a diff of the changes made by this patch
-			diffs: function(callback) { patches.get_patch_diff(patch, function(diffinfo) { callback(null, diffinfo); } ); }
+			diffs: function(callback) { patch.getDiff(function(diffinfo) { callback(null, diffinfo); } ); }
 		},
 		function(err, result) {
 			// for navigating the files, which is the parent directory path?
@@ -54,17 +54,17 @@ exports.set_routes = function(app) {
 
 	// New Patch
 	app.get('/patch/:patch/_new', function(req, res){
-		var patch = patches.load_patch(req.params.patch);
-		patch = patches.create_patch_from(patch);
+		var patch = patches.Patch.load(req.params.patch);
+		patch = patch.createChild();
 		res.redirect(patch.edit_url);
 	});
 
 	// Rename/Delete Patch
 	app.post('/patch/:patch/_action', function(req, res){
-		var patch = patches.load_patch(req.params.patch);
+		var patch = patches.Patch.load(req.params.patch);
 		if (req.body.action == "rename") {
 			var new_id = req.body.value;
-			patches.rename_patch(patch, new_id, function(status, new_patch) {
+			patch.rename(new_id, function(status, new_patch) {
 				res.setHeader('Content-Type', 'application/json');
 				if (!status) {
 					res.send(JSON.stringify({
@@ -80,7 +80,7 @@ exports.set_routes = function(app) {
 			});
 		}
 		if (req.body.action == "delete") {
-			patches.delete_patch(patch, function(status) {
+			patch.delete(function(status) {
 				res.setHeader('Content-Type', 'application/json');
 				if (!status) {
 					res.send(JSON.stringify({
@@ -108,10 +108,13 @@ exports.set_routes = function(app) {
 	var edit_file_template = swig.compileFile(__dirname + '/templates/edit_file.html');
 	app.get('/patch/:patch/editor', function(req, res){
 		res.setHeader('Content-Type', 'text/html');
-		var patch = patches.load_patch(req.params.patch);
+		var patch = patches.Patch.load(req.params.patch);
 		var filename = req.query.file;
 
-		patches.get_patch_file_content(patch, filename, true, function(base_text, current_text) {
+		if (patch.children.length > 0)
+			throw "Cannot edit a file in a patch that is the base of another patch."
+
+		patch.getPathContent(filename, true, function(base_text, current_text) {
 			// make display nicer
 			base_text = spaces_to_tabs(base_text);
 			current_text = spaces_to_tabs(current_text);
@@ -127,13 +130,13 @@ exports.set_routes = function(app) {
 
 	// Save a modified file in a patch.
 	app.post('/save-patch-file', function(req, res){
-		var patch = patches.load_patch(req.body.patch);
+		var patch = patches.Patch.load(req.body.patch);
 		var filename = req.body.file;
 		var newtext = req.body.text;
 
 		newtext = tabs_to_spaces(newtext);
 
-		patches.write_changed_file(patch, filename, newtext)
+		patch.writePathContent(filename, newtext)
 
 		res.setHeader('Content-Type', 'application/json');
 		res.send(JSON.stringify({
