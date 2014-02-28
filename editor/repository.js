@@ -37,17 +37,18 @@ exports.get_repository_head = function(callback) {
 	});
 }
 
-exports.ls_hash = function(hash, callback) {
+exports.ls_hash = function(hash, recursive, callback) {
 	// Gets the directory listing corresponding to a hash, asynchronously. Calls callback
 	// with an array of directory entries, each an object with 'name', 'hash', 'type',
 	// and 'size' properties. Type is 'blob' (file) or 'tree' (directory). To move to
 	// a subdirectory, pass the hash associated with the subdirectory entry.
 	if (!hash) {
 		exports.get_repository_head(function(head_hash) {
-			exports.ls_hash(head_hash, callback);
+			exports.ls_hash(head_hash, recursive, callback);
 		});
 	} else {
-		execute_git(["ls-tree", "-lz", hash], function(output) {
+		execute_git(["ls-tree", "-lz" + (recursive ? 'r' : ''), hash],
+		function(output) {
 			var raw_entries = output.split("\0");
 			var entries = [];
 			raw_entries.forEach(function(item) {
@@ -68,7 +69,7 @@ exports.ls_hash = function(hash, callback) {
 }
 
 exports.ls = function(hash, path, callback) {
-	exports.ls_hash(hash, function(entries) {
+	exports.ls_hash(hash, false, function(entries) {
 		if (!path) {
 			callback(entries);
 		} else {
