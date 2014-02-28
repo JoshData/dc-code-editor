@@ -29,6 +29,7 @@
 		<div class="col-sm-6">
 			<h2>Preview</h2>
 			<div id="editor_preview">
+				<div id="content">
 			</div>
 		</div>
 	</div>
@@ -179,15 +180,15 @@
 	  			method: "POST",
 	  			success: function(res) {
 	  				if (res.status == "ok")
-				  		$('#editor_preview').html(res.html);
+				  		$('#editor_preview #content').html(res.html);
 				  	else
-				  		$('#editor_preview').text(res.error);
+				  		$('#editor_preview  #content').text(res.error);
 				  	$('#editor_preview a').each(function() {
 				  		this.setAttribute("target", "_blank")
 				  	})
 	  			},
 	  			error: function() {
-				  	$('#editor_preview').text("Error creating the preview.");
+				  	$('#editor_preview #content').text("Error creating the preview.");
 	  			},
 	  		});
 	  }
