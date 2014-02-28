@@ -3,6 +3,8 @@ var pathlib  = require('path');
 var async = require('async');
 var patches = require("./patches.js");
 
+String.prototype.repeat = function( num ) { return new Array( num + 1 ).join( this ); }
+
 exports.set_routes = function(app) {
 	// Home Screen
 	var home_template = swig.compileFile(__dirname + '/templates/index.html');
@@ -95,6 +97,13 @@ exports.set_routes = function(app) {
 		}
 	});
 
+	function spaces_to_tabs(str) {
+		return str.replace(/\n(  )+/g, function(m) { return "\n" + "\t".repeat((m.length-1)/2); });
+	}
+	function tabs_to_spaces(str) {
+		return str.replace(/\n(\t)+/g, function(m) { return "\n" + "  ".repeat(m.length-1); });
+	}
+
 	// File Edit
 	var edit_file_template = swig.compileFile(__dirname + '/templates/edit_file.html');
 	app.get('/patch/:patch/editor', function(req, res){
@@ -103,6 +112,10 @@ exports.set_routes = function(app) {
 		var filename = req.query.file;
 
 		patches.get_patch_file_content(patch, filename, true, function(base_text, current_text) {
+			// make display nicer
+			base_text = spaces_to_tabs(base_text);
+			current_text = spaces_to_tabs(current_text);
+
 			res.send(edit_file_template({
 				patch: patch,
 				filename: filename,
@@ -117,6 +130,8 @@ exports.set_routes = function(app) {
 		var patch = patches.load_patch(req.body.patch);
 		var filename = req.body.file;
 		var newtext = req.body.text;
+
+		newtext = tabs_to_spaces(newtext);
 
 		patches.write_changed_file(patch, filename, newtext)
 
