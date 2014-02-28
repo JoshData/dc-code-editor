@@ -1,0 +1,2 @@
+#!/bin/sh
+supervisor -e js,html node editor/index.js

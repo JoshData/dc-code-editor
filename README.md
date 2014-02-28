@@ -31,5 +31,10 @@ Run
 
 	node editor/index.js
 
+or
+
+	npm install -g supervisor
+	./run
+
 The open your browser to http://localhost:8000/.
 
