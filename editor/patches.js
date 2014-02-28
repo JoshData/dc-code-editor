@@ -4,6 +4,7 @@ var path = require("path");
 var clone = require('clone');
 var uuid = require('node-uuid');
 var async = require('async');
+var jsdiff = require('diff');
 
 var repo = require("./repository.js");
 var settings = require("./settings.js");
@@ -156,16 +157,19 @@ function load_patch_from_uuid(uuid, callback) {
 	});
 }
 
-exports.get_patch_files = function(patch, path, callback) {
+exports.get_file_list = function(patch, path, with_deleted_files, callback) {
+	// Get a list of files that exist after this patch is applied.
+	// If with_deleted_files, then we include files deleted by this patch.
 	if (patch.type == "root") {
 		// Go to the repository to get the files in the indicated path.
 		repo.ls(null, path, callback);
 	} else {
-		// Get the files in the base path.
+		// Get the files in the base patch, never including files
+		// deleted in the base patch.
 		load_patch_from_uuid(patch.base, function(base) {
-			exports.get_patch_files(base, path, function(entries) {
-				// And modify according to the added and removed files in this patch.
-				// TODO.
+			exports.get_file_list(base, path, false, function(entries) {
+				// TODO: Modify according to the added and removed files in
+				// this patch.
 				callback(entries);
 			})
 		})
@@ -356,4 +360,85 @@ exports.delete_patch = function(patch, callback) {
 		}
 	);
 
+}
+
+function simplify_diff(diff) {
+	// Only include hunks that represent unchanged content
+	// that ocurr on the same line as changed content.
+	// Between lines, add an ellipsis.
+	var new_diff = [];
+	var this_line = [];
+	var wants_more = false;
+	var added_ellipsis = false;
+	diff.forEach(function(hunk) {
+		if (hunk.added || hunk.removed) {
+			// append all of this_line to the end of new_diff, then clear it
+			new_diff = new_diff.concat(this_line);
+			this_line = [];
+
+			// and append this changed hunk
+			new_diff.push(hunk);
+
+			// we want to continue adding hunks to the end of the line
+			// if this change doesn't end with a newline
+			wants_more = (hunk.value.charAt(new_diff.length-1) != "\n");
+			added_ellipsis = false;
+		} else {
+			// if we want more to the end of the line, add the part
+			// of this hunk to its first newline character.
+			var n1 = hunk.value.indexOf("\n");
+			if (wants_more) {
+				if (n1 >= 0) wants_more = false; // the end of line is in here
+				n1 = (n1 >= 0 ? (n1+1) : hunk.value.length);
+				var h = hunk.value.substring(0, n1);
+				hunk.value = hunk.value.substring(n1);
+				new_diff.push({ value: h });
+				added_ellipsis = false;
+			}
+
+			var n2 = hunk.value.lastIndexOf("\n");
+			if (n2 == -1) {
+				this_line.push({ value: hunk.value });
+			} else {
+				// if we're about to kill a previously buffered line,
+				// or we're dropping content in this hunk before the
+				// newline, and we didn't just add an ellipsis, and
+				// if we're not adding an ellipsis at the very beginning...
+				if ((this_line.length > 0 || n2 > 0) && !added_ellipsis && new_diff.length > 0) {
+					added_ellipsis = true;
+					new_diff.push({ value: " · · ·\n", ellipsis: true });
+				}
+				this_line = [];
+				this_line.push({ value: hunk.value.substring(n2+1) });
+			}
+		}
+	});
+
+	// remove an ellipsis at the end
+	if (new_diff.length > 0 && new_diff[new_diff.length-1].ellipsis)
+		new_diff.pop();
+
+	return new_diff;
+}
+
+exports.get_patch_diff = function(patch, callback) {
+	// Computes a list of objects that have 'path' and 'diff'
+	// attributes representing the changes made by this patch.
+	async.parallel(
+		// map the changed paths to functions that compute
+		// the unified diff on the changed path
+		Object.keys(patch.files).map(function(changed_path) {
+			return function(callback2) {
+				exports.get_patch_file_content(patch, changed_path, true, function(base_content, current_content) {
+					var diff = jsdiff.diffWords(base_content, current_content);
+					diff = simplify_diff(diff);
+					callback2(null, { path: changed_path, diff: diff }) // null=no error
+				});
+			};
+		}),
+
+		function(err, results) {
+			callback(results);
+		}
+	);	
 }

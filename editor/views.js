@@ -1,5 +1,6 @@
 var swig  = require('swig');
 var pathlib  = require('path');
+var async = require('async');
 var patches = require("./patches.js");
 
 exports.set_routes = function(app) {
@@ -18,19 +19,35 @@ exports.set_routes = function(app) {
 		res.setHeader('Content-Type', 'text/html');
 
 		var patch = patches.load_patch(req.params.patch);
-		patches.get_patch_files(patch, req.query.path, function(file_list) {
-			var pathlib = require("path");
+
+		async.parallel(
+		{
+			// get the list of editable files
+			file_list: function(callback) {
+				patches.get_file_list(
+					patch, req.query.path, true,
+					function(file_list) {
+						callback(null, file_list); // null=no error
+					});
+				},
+
+			// get a diff of the changes made by this patch
+			diffs: function(callback) { patches.get_patch_diff(patch, function(diffinfo) { callback(null, diffinfo); } ); }
+		},
+		function(err, result) {
+			// for navigating the files, which is the parent directory path?
 			var path_up = null;
 			if (req.query.path)
 				path_up = pathlib.dirname(req.query.path);
 
 			res.send(show_patch_template({
 				patch: patch,
-				files: file_list,
+				files: result.file_list,
 				path: req.query.path,
-				path_up: path_up
+				path_up: path_up,
+				diffs: result.diffs
 			}));
-		})
+		});
 	});
 
 	// New Patch

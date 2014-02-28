@@ -2,6 +2,25 @@
 
 @import url(http://fonts.googleapis.com/css?family=Fenix);
 
+#diffs > .diff {
+	white-space: pre-wrap;
+	font-size: 17px;
+	line-height: 22px;
+	font-family: Fenix, 'Times New Roman' !important;
+	border: 1px solid #DDD;
+	background-color: #FAFAFA;
+	padding: 3px;
+}
+	#diffs > .diff > .added {
+		background-color: #FEE;
+		font-weight: bold;
+	}
+	#diffs > .diff > .removed {
+		background-color: #FEE;
+		color: #888;
+		text-decoration: line-through;
+	}
+
 .CodeMirror {
 	font-size: 19px !important;
 	line-height: 25px !important;

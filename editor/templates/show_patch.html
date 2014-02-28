@@ -11,18 +11,25 @@
 	</p>
 	<h1 style="margin-top: 0">{{patch.title}}</h1>
 
-	{% if patch.can_modify %}
 	<div class="row">
-		{% if patch.has_changes %}
+		{% if diffs %}
 		<div class="col-sm-6">
-			<h2>Continue Editing...</h2>
+			<h2>Changed In This Patch</h2>
 
+			<h3>File List</h3>
 			<ul style="list-style: none; padding: 0;">
-				{% for change in patch.changed_files.all %}
-					<li><a href="{{change.get_absolute_url}}">{{change.filename}}</a></li>
+				{% for change in diffs %}
+					<a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a>
 				{% endfor %}
 			</ul>
 
+			<h3>Changes</h3>
+			<div id="diffs">
+				{% for change in diffs %}
+					<p class="filename"><a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a></p>
+					<div class="diff">{% for word in change.diff %}<span class="{% if word.added %}added{% endif %} {% if word.removed %}removed{% endif %}">{{word.value}}</span>{% endfor %}</div>
+				{% endfor %}
+			</div>
 		</div>
 		{% endif %}
 
@@ -47,7 +54,6 @@
 			</ul>
 		</div>
 	</div>
-	{% endif %}
 
 	<!--
 	<h2>New Patch</h2>
