@@ -175,6 +175,8 @@
 	  		"/render-body",
 	  		{
 	  			data: {
+	  				patch: "{{patch.id}}",
+	  				path: "{{filename}}",
 	  				text: editor.getValue()
 	  			},
 	  			method: "POST",
@@ -183,8 +185,15 @@
 				  		$('#editor_preview #content').html(res.html);
 				  	else
 				  		$('#editor_preview  #content').text(res.error);
-				  	$('#editor_preview a').each(function() {
+
+				  	// make external links open in a new tab to not disturb the editor
+				  	$('#editor_preview a:not(.internal-link)').each(function() {
 				  		this.setAttribute("target", "_blank")
+				  	})
+
+				  	// make internal links open the editor on that file
+				  	$('#editor_preview a.internal-link').each(function() {
+				  		this.setAttribute("href", "{{patch.edit_url}}/editor?file={% if dirname != '.' %}{{dirname}}/{% endif %}" + this.getAttribute('href').replace(/\.html/, ".xml"));
 				  	})
 	  			},
 	  			error: function() {
