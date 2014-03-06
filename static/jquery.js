@@ -1,0 +1,1 @@
+../ext/bootstrap/js/tests/vendor/jquery.js
