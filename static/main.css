@@ -18,6 +18,8 @@
 	margin-left: 2em;
 	font-size: 90%;
 }
+	#timeline .timeline-patch-metadata a:before { content: "<"; }
+	#timeline .timeline-patch-metadata a:after { content: ">"; }
 #timeline .uparrow {
 	background-image: url('arrowhead.png');
 	width: 8px;

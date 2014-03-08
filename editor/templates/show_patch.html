@@ -90,24 +90,14 @@
 			if (!value) return;
 		}
 
-	  	$.ajax(
-	  		"{{patch.edit_url}}/_action",
-	  		{
-	  			data: {
-	  				action: action,
-	  				value: value
-	  			},
-	  			method: "POST",
-	  			success: function(res) {
-	  				if (res.status == "ok")
-	  					window.location = res.redirect;
-	  				else
-	  					show_modal_error(action, res.msg);
-	  			},
-	  			error: function() {
-				  	show_modal_error(action, "There was an error, sorry.");
-	  			}
-	  		});
+		ajax_call(
+			"{{patch.edit_url}}/_action",
+			{
+  				action: action,
+  				value: value
+  			},
+  			function(res) { window.location = res.redirect; },
+  			action);
 	}
 
 </script>

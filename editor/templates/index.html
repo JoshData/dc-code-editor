@@ -20,6 +20,9 @@
 						{% if row.modify_with_new_patch %}
 							<div><a href="{{row.edit_url}}/_new">Revise Patch</a></div>
 						{% endif %}
+						{% if row.indent > 0 %}
+							<div><a href="{{row.edit_url}}/_merge_up" onclick="return do_merge_up(this);">Merge with Parent</a></div>
+						{% endif %}
 					</div>
 				</div>
 			</div>
@@ -27,4 +30,18 @@
 	</div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+function do_merge_up(elem) {
+	ajax_call(
+		elem.getAttribute('href'),
+		{ },
+		function(res) { window.location.reload(); },
+		"Merge Patch with Parent");
+	return false;
+}
+
+</script>
 {% endblock %}

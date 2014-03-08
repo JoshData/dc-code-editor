@@ -213,6 +213,19 @@ exports.set_routes = function(app) {
 			});
 
 	});
+
+	// Merge a Patch with its Parent
+	app.post('/patch/:patch/_merge_up', function(req, res){
+		var patch = patches.Patch.load(req.params.patch);
+		patch.merge_up(function(err) {
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify({
+				"status": (!err ? "ok" : "error"),
+				"msg": ""+err
+			}));
+		});
+	});
+
 }
 
 function finish_preview(fn, dom, other_resources, res) {

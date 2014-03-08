@@ -352,9 +352,11 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 	}
 }
 
-Patch.prototype.writePathContent = function(path, new_content) {
+Patch.prototype.writePathContent = function(path, new_content, override_checks) {
 	/* Writes to disk the new content for a path modified
 	   by this patch. */
+
+	if (!override_checks && (this.type == "root" || this.children.length > 0)) throw "Cannot modify the content of a root patch or a patch that has children!"
 
   	var needs_save = false;
 
@@ -420,7 +422,7 @@ Patch.prototype.rename = function(new_id, callback) {
 		});
 }
 
-Patch.prototype.delete = function(callback) {
+Patch.prototype.delete = function(callback, force) {
 	/* Delete a patch, but only if the patch doesn't actually make any changes.
 
 	   If the patch has child patches, revise their base to be the base of this patch.
@@ -438,23 +440,26 @@ Patch.prototype.delete = function(callback) {
 	// Is this patch a no-op? In parallel, look at each modified file.
 	// See if the new contents differ from the old contents. Doing
 	// this asynchronously unfortunately makes this very hard to read.
-	async.parallel(
-		// map the file paths modified by this patch to a function that
-		// async can call to process that file.
-		Object.keys(patch.files).map(function(path) {
-			return function(callback) {
-				// get the base and revised content of the modified file
-				patch.getPathContent(path, true,
-					function(base_content, new_content) {
-						// check if the content has been modified and call the async.parallel
-						// callback method with null for the error argument and...
-						if (base_content == new_content)
-							callback(null, null); // "null" to signal no actual change in this file
-						else
-							callback(null, path); // the changed path to signal a path that has modified content
-					});
-			};
-		}),
+	async.map(
+		Object.keys(patch.files),
+		function(path, callback) {
+			// if 'force', don't check if the path has modifications
+			if (force) {
+				callback(null, null);
+				return;
+			}
+
+			// get the base and revised content of the modified file
+			patch.getPathContent(path, true,
+				function(base_content, new_content) {
+					// check if the content has been modified and call the async.parallel
+					// callback method with null for the error argument and...
+					if (base_content == new_content)
+						callback(null, null); // "null" to signal no actual change in this file
+					else
+						callback(null, path); // the changed path to signal a path that has modified content
+				});
+		},
 		function(err, results) {
 			// remove the nulls from the results which came from unmodified paths,
 			// keeping just the strings which are the paths of modified files.
@@ -464,53 +469,53 @@ Patch.prototype.delete = function(callback) {
 				return;
 			}
 
-			// There are no modified files, so this patch may be deleted.
+			// There are no modified files, or force is true, so this patch may be deleted.
 
-			// In order to delete a patch, any patch whose base is this patch must be revised
-			// so that its base is the base of this path. Since the reference to the child
-			// patches is by UUID, we can only load them asynchronously, so we have to use
-			// async.parellel again.
-			async.parallel(
-				// map the children UUIDs to a function that async.parallel can call to
-				// process that UUID.
-				patch.children.map(function(child_uuid) {
-					return function(callback) {
-						// the function asyncronously loads the child patch by its UUID
-						Patch.loadByUUID(child_uuid, function(child_patch) {
-							// and then updates the child...
-							child_patch.base = patch.base;
-							child_patch.save();
+			async.parallel({
+				update_children: function(callback) {
+					// In order to delete a patch, any patch whose base is this patch must be revised
+					// so that its base is the base of this path. Since the reference to the child
+					// patches is by UUID, we can only load them asynchronously, so we have to use
+					// async.parellel again.
+					async.map(
+						patch.children,
+						function(child_uuid, callback) {
+							// the function asyncronously loads the child patch by its UUID
+							Patch.loadByUUID(child_uuid, function(child_patch) {
+								// and then updates the child...
+								child_patch.base = patch.base;
+								child_patch.save();
 
-							// and finally signals that this work is done.
-							callback();
-						});
-					};
-				}).concat([
+								// and finally signals that this work is done.
+								callback();
+							});
+						},
+						callback // no error is possible
+					);
+				},
 
-				// also if this patch has a base, update the base to remove the reference to
-				// this patch as a child.
-				function(callback) {
+				update_base: function(callback) {
+					// if this patch has a base, update the base to remove the reference to
+					// this patch as a child.
 					if (patch.type != "patch") {
 						// root patches don't have a base
 						callback();
 						return;
 					}
 					patch.getBase(function(base_patch) {
-						base_patch.children = base_patch.children.filter(function(child_uuid) { child_uuid != patch.uuid });
+						base_patch.children = base_patch.children.filter(function(child_uuid) { return child_uuid != patch.uuid });
 						base_patch.save();
 						callback();
 					});
-				}
+				},
 
-				]),
-				function (err, results) {
-					// At this point the patch is safe to delete.
-
-					// Delete the storage of modified paths synchronously.
+				delete_files: function(callback) {
+					// Some paths may not have modifications but may still have a file written
+					// to disk with unchanged data. Or we may have specified force. So any
+					// storage for this file must be deleted, which we do now synchronously.
 					Object.keys(patch.files).forEach(function(path) {
-						if (patch.files[path].method == "raw") {
+						if (patch.files[path].method == "raw")
 							fs.unlinkSync(settings.workspace_directory + "/" + patch.id + "/" + patch.files[path].storage);
-						}
 					});
 
 					// Delete the index file synchronously.
@@ -520,9 +525,14 @@ Patch.prototype.delete = function(callback) {
 					fs.rmdirSync(settings.workspace_directory + "/" + patch.id);
 
 					// Signal success.
-					callback(null);
+					callback();					
 				}
-			);
+
+			},
+			function(err, result) {
+				if (err) err = "Really bad error while updating patches: " + err + " Workspace may be corrupted.";
+				callback(err);
+			});
 		}
 	);
 
@@ -608,4 +618,214 @@ Patch.prototype.getDiff = function(callback) {
 			callback(results);
 		}
 	);	
+}
+
+Patch.prototype.get_jot_operations = function(callback) {
+	/* Computes an array of JOT operations object that represent the changes made by this patch. 
+	   Passes the array to the callback. */
+
+	var jot_objects = require('../ext/jot/jot/objects.js');
+	var jot_sequences = require('../ext/jot/jot/sequences.js');
+	var jot_values = require('../ext/jot/jot/values.js');
+	var jot_meta = require('../ext/jot/jot/meta.js');
+
+	// map each changed file to a JOT operation
+	var patch = this;
+	async.map(
+		Object.keys(patch.files),
+		function(changed_path, callback) {
+			patch.getPathContent(changed_path, true, function(base_content, current_content) {
+				callback(
+					null, // no error
+					jot_objects.APPLY(
+						changed_path,
+						jot_meta.COMPOSITION(
+							// use Google Diff Match Patch to create an array of operations
+							// that represent the changes made to this path
+							jot_sequences.from_string_rep(
+								jot_values.REP(
+									base_content,
+									current_content
+									)
+							)
+						)
+					)
+				);
+			});
+		},
+		function(err, result) {
+			var ret = [];
+			for (var i in result)
+				ret = ret.concat(result[i]);
+			callback(ret)
+		}
+	);	
+};
+
+Patch.prototype.compute_rebase = function(jot_op, callback) {
+	// Computes the rebase of the *subtree* headed by this patch
+	// against jot_op, which is a JOT operation object representing
+	// the changes made in the patch we are rebasing against.
+
+	var patch = this;
+	this.get_jot_operations(function(this_as_jot_op) {
+		// compute the rebase of this patch
+		var jot_base = require('../ext/jot/jot/base.js');
+		var result = jot_base.rebase_array(jot_op, this_as_jot_op);
+		var inverse_result = jot_base.rebase_array(this_as_jot_op, jot_op);
+		if (!result || !inverse_result) {
+			callback("The changes conflict with the changes in patch " + patch.title + ".");
+			return;
+		}
+
+		async.map(
+			patch.children,
+			function(child_uuid, callback) {
+				Patch.loadByUUID(child_uuid, function(child_patch) {
+					child_patch.compute_rebase(inverse_result, function(err, result) {
+						if (err) {
+							callback(err);
+							return;
+						}
+						callback(null, [child_uuid, result])
+					});
+				})
+			},
+			function(err, child_results) {
+				if (err) {
+					callback(err);
+					return;
+				}
+
+				callback(
+					null, // no error
+					{
+						me: result,
+						children: child_results
+					});
+			}
+		);
+	});
+}
+
+Patch.prototype.save_rebase = function(rebase_data, callback) {
+	// Apply
+
+	var jot_base = require('../ext/jot/jot/base.js');
+
+	var patch = this;
+
+	// rebase_data.me contains an array of JOT objects APPLY operations,
+	// each specifying the path of a modified file.
+	async.map(
+		rebase_data.me,
+		function(applyop, callback) {
+			// This JOT operation has a key named 'key' which has the
+			// path of a modified file, and another key named 'op' which
+			// has a COMPOSITION operation which will transform the file
+			// contents.
+			var changed_path = applyop.key;
+			patch.getPathContent(changed_path, true, function(base_content) {
+				console.log(patch.title, changed_path, applyop.op);
+				console.log(base_content);
+				var rebased_content = jot_base.apply(applyop.op, base_content);
+				patch.writePathContent(changed_path, rebased_content, true); // 'true' overrides sanity checks, since usually we are not allowed to write to patches with children
+				callback(); // no errror & nothing to return
+			});
+		},
+		function() {
+			// no error or results are possible
+
+			// now apply to the children
+			async.map(
+				rebase_data.children,
+				function(child_info, callback) {
+					var child_uuid = child_info[0];
+					var child_rebase_data = child_info[1];
+					Patch.loadByUUID(child_uuid, function(child_patch) {
+						child_patch.save_rebase(child_rebase_data, callback);
+					})
+				},
+				function() {
+					callback(); // done, no error & nothing to return
+				}
+			);
+		}
+	);
+}
+
+Patch.prototype.merge_up = function(callback) {
+	/* Merges a patch with its parent, rebasing any other children of the parent. 
+	   This patch may not have any children. */
+
+	if (this.type == "root") throw "Cannot merge up a root patch."
+	if (this.children.length > 0) throw "Cannot merge up a patch that has children."
+
+	var patch = this;
+
+	// First turn this patch into a JOT operation.
+	patch.get_jot_operations(function(patch_as_jot_op) {
+		// Now attempt to rebase each sibling tree in parallel.
+		patch.getBase(function(base_patch) {
+			// get the other children of base_patch
+			var sibling_uuids = base_patch.children.filter(function(item) { return item != patch.uuid });
+
+			// compute the rebase of each sibling
+			async.map(
+				sibling_uuids,
+				function(uuid, callback) {
+					Patch.loadByUUID(uuid, function(sibling_patch) {
+						sibling_patch.compute_rebase(patch_as_jot_op, callback)
+					})
+				},
+				function(err, sibling_rebase_data) {
+					if (err) {
+						callback(err);
+						return;
+					}
+
+					// Now that we know the rebase was successful, we can apply it.
+
+					// for each modified path in this patch, save the new content
+					// as the contents of the path in the base patch
+					async.map(
+						Object.keys(patch.files),
+						function(changed_path, callback) {
+							patch.getPathContent(changed_path, false, function(base_content, current_content) {
+								base_patch.writePathContent(changed_path, current_content, true); // 'true' overrides sanity checks, since usually we are not allowed to write to patches with children
+								callback(); // no errror & nothing to return
+							});
+						},
+						function() {
+							// no error is possible
+
+							// delete the patch
+							patch.delete(function(err) {
+								if (err) {
+									callback("Really bad error while deleting the patch: " + err + " Workspace is possibly corrupted.");
+									return;
+								}
+
+								// Now that the base patch has been updated, apply the rebased operations
+								// computed above to update the patch content of the siblings.
+								async.map(
+									Object.keys(sibling_uuids), // => array indexes
+									function(i, callback) {
+										Patch.loadByUUID(sibling_uuids[i], function(sibling_patch) {
+											sibling_patch.save_rebase(sibling_rebase_data[i], callback);
+										})								
+									},
+									function(err) {
+										if (err) err = "Really bad error while writing rebased patches: " + err + " Workspace is possibly corrupted.";
+										callback(err);
+									}
+								);
+							});
+						}
+					);
+				}
+			);
+		});
+	});
+
 }

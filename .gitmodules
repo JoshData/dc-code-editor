@@ -10,3 +10,6 @@
 [submodule "ext/bootstrap"]
 	path = ext/bootstrap
 	url = https://github.com/twbs/bootstrap
+[submodule "ext/jot"]
+	path = ext/jot
+	url = https://github.com/JoshData/jot

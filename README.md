@@ -22,6 +22,11 @@ This repository has been tested with Ubuntu 13.10.
 	npm install
 	cd ../..
 
+	# install dependencies of jot
+	cd ext/jot
+	npm install
+	cd ../..
+
 	# download the DC Code
 	git clone https://github.com/JoshData/dc-code-prototype base_code
 
