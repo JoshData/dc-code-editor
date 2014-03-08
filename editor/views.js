@@ -14,8 +14,8 @@ exports.set_routes = function(app) {
 		res.setHeader('Content-Type', 'text/html');
 		patches.getTree(function(patch_tree) {
 			res.send(home_template({
-				patch_tree_rows: patch_tree,
-				head_patch: patch_tree[0][0].obj
+				patch_tree: patch_tree,
+				head_patch: patch_tree[0]
 			}));
 		});
 	});
@@ -34,6 +34,7 @@ exports.set_routes = function(app) {
 				patch.getPaths(
 					req.query.path, true,
 					function(file_list) {
+						patches.sort_paths(file_list);
 						callback(null, file_list); // null=no error
 					});
 				},
@@ -49,6 +50,7 @@ exports.set_routes = function(app) {
 
 			res.send(show_patch_template({
 				patch: patch,
+				readonly: (patch.type == "root") || (patch.children.length > 0),
 				files: result.file_list,
 				path: req.query.path,
 				path_up: path_up,
@@ -116,16 +118,15 @@ exports.set_routes = function(app) {
 		var patch = patches.Patch.load(req.params.patch);
 		var filename = req.query.file;
 
-		if (patch.children.length > 0)
-			throw "Cannot edit a file in a patch that is the base of another patch."
-
-		patch.getPathContent(filename, true, function(base_text, current_text) {
+		var has_base_text = (patch.type != "root");
+		patch.getPathContent(filename, has_base_text, function(base_text, current_text) {
 			// make display nicer
-			base_text = spaces_to_tabs(base_text);
+			if (has_base_text) base_text = spaces_to_tabs(base_text);
 			current_text = spaces_to_tabs(current_text);
 
 			res.send(edit_file_template({
 				patch: patch,
+				readonly: !has_base_text || (patch.children.length > 0),
 				filename: filename,
 				dirname: pathlib.dirname(filename),
 				base_text: JSON.stringify(base_text),
@@ -139,6 +140,9 @@ exports.set_routes = function(app) {
 		var patch = patches.Patch.load(req.body.patch);
 		var filename = req.body.file;
 		var newtext = req.body.text;
+
+		if (patch.type == "root" || patch.children.length > 0)
+			throw "Cannot modify a root patch or a patch that has children.";
 
 		newtext = tabs_to_spaces(newtext);
 

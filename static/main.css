@@ -1,15 +1,27 @@
 /* Home */
 
-#timeline .timeline-row {
+#timeline {
 	clear: both;
 }
-#timeline .timeline-patch {
-	width: 250px;
-	float: left;
-	margin: 0 20px 20px 0;
+#timeline .timeline-row {
+	margin-left: 3px;
+	border-left: 2px solid black;
+	padding-left: 8px;
 }
+	#timeline .timeline-patch {
+		padding-bottom: 1em;
+	}
+	#timeline .timeline-patch.root {
+		padding-bottom: 0;
+	}
 #timeline .timeline-patch-metadata {
+	margin-left: 2em;
 	font-size: 90%;
+}
+#timeline .uparrow {
+	background-image: url('arrowhead.png');
+	width: 8px;
+	height: 8px;
 }
 
 /* Patch View */

@@ -11,21 +11,19 @@
 	<h1>Timeline</h1>
 
 	<div id="timeline">
-	{% for row in patch_tree_rows %}
-		<div class="timeline-row">
-			{% for rec in row %}
-				<div class="timeline-patch">
-					<div class="timeline-patch-anchor"><a href="{{rec.obj.edit_url}}">{{rec.obj.title}}</a></div>
+		<div class="uparrow"> </div>
+		{% for row in patch_tree %}
+			<div class="timeline-row">
+				<div class="timeline-patch {% if row.is_root %}root{% endif %}" style="margin-left: {{row.indent * 2}}em">
+					<div class="timeline-patch-anchor"><a href="{{row.edit_url}}">{{row.title}}</a></div>
 					<div class="timeline-patch-metadata">
-						<div>Created: {{rec.obj.created_formatted}}</div>
-						{% if rec.obj.type != "root" and rec.obj.children.length %}
-							<div><a href="{{rec.obj.edit_url}}/_new">Modify</a></div>
+						{% if row.modify_with_new_patch %}
+							<div><a href="{{row.edit_url}}/_new">Revise Patch</a></div>
 						{% endif %}
 					</div>
 				</div>
-			{% endfor %}
-		</div>
-	{% endfor %}
+			</div>
+		{% endfor %}
 	</div>
 </div>
 

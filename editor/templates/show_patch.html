@@ -12,31 +12,43 @@
 	<h1 style="margin-top: 0">{{patch.title}}</h1>
 
 	<div class="row">
-		{% if diffs %}
+		{% if patch.type != "root" %}
 		<div class="col-sm-6">
 			<h2>Changed In This Patch</h2>
 
-			<h3>File List</h3>
-			<ul style="list-style: none; padding: 0;">
-				{% for change in diffs %}
-					<a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a>
-				{% endfor %}
-			</ul>
+			{% if diffs.length > 0 %}
+				<h3>File List</h3>
+				<ul style="list-style: none; padding: 0;">
+					{% for change in diffs %}
+						<a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a>
+					{% endfor %}
+				</ul>
 
-			<h3>Changes</h3>
-			<div id="diffs">
-				{% for change in diffs %}
-					<p class="filename"><a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a></p>
-					<div class="diff">{% for word in change.diff %}<span class="{% if word.added %}added{% endif %} {% if word.removed %}removed{% endif %}">{{word.value}}</span>{% endfor %}</div>
-				{% endfor %}
-			</div>
+				<h3>Changes</h3>
+				<div id="diffs">
+					{% for change in diffs %}
+						<p class="filename"><a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a></p>
+						<div class="diff">{% for word in change.diff %}<span class="{% if word.added %}added{% endif %} {% if word.removed %}removed{% endif %}">{{word.value}}</span>{% endfor %}</div>
+					{% endfor %}
+				</div>
+			{% else %}
+				<p>There are no changes to the code in this patch.
+			{% endif %}
 		</div>
 		{% endif %}
 
 		<div class="col-sm-6">
-			<h2>Edit {% if patch.has_changes %}New{% endif %} File...</h2>
-
-			<p>Choose a file below to modify it:</p>
+			{% if !readonly %}
+				<h2>Edit {% if patch.has_changes %}New{% endif %} File...</h2>
+				<p>Choose a file below to modify it:</p>
+			{% else %}
+				<h2>View File</h2>
+				{% if patch.type == "root" %}
+					<p>The files cannot be modified in a root patch.</p>
+				{% else %}
+					<p>The files cannot be modified in this patch because there are other patches that continue from it. To modify this patch, first start a <a href="{{patch.edit_url}}/_new">revision patch</a> and then merge the patches.</p>
+				{% endif %}
+			{% endif %}
 
 			<ul style="list-style: none; padding: 0;">
 			{% if path_up %}
@@ -45,7 +57,7 @@
 			{% for entry in files %}
 			<li>
 				{% if entry.type == "tree" %}
-					[DIR] <a href="{{patch.edit_url}}?path={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>
+					<a href="{{patch.edit_url}}?path={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>/...
 				{% else %}
 					<a href="{{patch.edit_url}}/editor?file={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>
 				{% endif %}

@@ -18,10 +18,16 @@
 	</p>
 	<h1 style="margin: 0">{{filename}}</h1>
 
+  	{% if readonly %}<p style="margin-top: 1em" class="text-warning">This patch is read-only.</p>{% endif %}
+
 	<div class="row">
 		<div class="col-sm-6">
 			<div id="save_status">&nbsp;</div>
-			<h2>Edit File</h2>
+			{% if !readonly %}
+				<h2>Edit File</h2>
+			{% else %}
+				<h2>View File</h2>
+			{% endif %}
 
 			<textarea id="editor_textarea" style="display: none">{{current_text}}</textarea>
 		</div>
@@ -48,6 +54,7 @@
 
 	  var editor = CodeMirror.fromTextArea($("#editor_textarea")[0], {
 	    mode: "text/xml",
+	    readOnly: {% if readonly %}true{% else %}false{% endif %},
 	    lineWrapping: true,
 	    autofocus: true,
 	    lineNumbers: true,
@@ -59,7 +66,7 @@
 	  editor.on('change', on_change);
 	  $(function() {
 	  	// things to do on initialization
-	  	update_diff();
+	  	if (base_text) update_diff(); // no base_text when viewing a root patch
 	  	update_preview()
 	  });
 
@@ -146,6 +153,7 @@
 	  	save_document();
 	  }
 
+	  {% if !readonly %}
 	  function save_document() {
 	  	$.ajax(
 	  		"/save-patch-file",
@@ -169,6 +177,7 @@
 	  			},
 	  		});
 	  }
+	  {% endif %}
 
 	  function update_preview() {
 	  	$.ajax(

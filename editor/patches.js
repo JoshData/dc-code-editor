@@ -77,46 +77,64 @@ exports.getTree = function(callback) {
 			uuid_map[patches[i].uuid] = patches[i];
 
 		// find the root patch
-		var root = null;
+		var root_patch = null;
 		for (var i in patches)
 			if (patches[i].type == "root")
-				root = { obj: patches[i], depth: 0, children: [] };
+				root_patch = patches[i];
 
 		// recursively add the children, at each child compute
 		// the 'depth' which is the maximum depth of any subtree
 		// from the child, and sort the children from greatest
-		// depth to least depth.
-		function add_children(rec) {
-			for (var i in rec.obj.children) {
-				var child = { obj: uuid_map[rec.obj.children[i]], depth: 0, children: [] };
+		// depth to least depth so that we know which child of
+		// a patch is most likely the main line and which is
+		// a side patch waiting to be merged.
+		function add_children(patch, is_root) {
+			var rec = {
+				id: patch.id,
+				uuid: patch.uuid,
+				title: patch.title,
+				edit_url: patch.edit_url,
+				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
+				is_root: is_root,
+				depth: 0,
+				children: []
+			};
+			for (var i in patch.children) {
+				var child = uuid_map[patch.children[i]];
+				child = add_children(child);
 				rec.children.push(child);
-				add_children(child);
 				if (child.depth + 1 > rec.depth) rec.depth = child.depth+1;
 			}
-			rec.children.sort(function(a,b) { a.depth-b.depth });
+			rec.children.sort(function(a,b) { b.depth-a.depth });
+			return rec;
 		}
-		add_children(root);
+		var root_rec = add_children(root_patch, true);
 
-		// serialize the tree into an array of rows, where each row
-		// is an array of patches to display in columns
-		var rows = [[root]];
-		while (true) {
-			var next_row = [];
-			var row = rows[rows.length-1];
-			row.forEach(function(rec, ri) {
-				rec.children.forEach(function(child, ci) {
-					if (ri == 0 && row.length == 1 && ci > 0)
-						row.push(child);
-					else
-						next_row.push(child);
-				})
-			})
-			if (next_row.length == 0) break;
-			rows.push(next_row);
+		// pull out the first child of each patch to make a list, and have the
+		// remaining children of each patch be children.
+		function serialize(rec, ret, indent) {
+			var children = rec.children;
+			delete rec.children;
+			rec.indent = (indent||0);
+
+			// do the first child first, to make this in reverse chronological order
+			// at the top level
+			if (rec.indent == 0 && children.length > 0)
+				serialize(children.shift(), ret, indent);
+
+			// then the patch itself
+			ret.push(rec);
+
+			// then any other child, which is shown as a sub-patch within the
+			// main patch 
+			children.forEach(function(item) {
+				serialize(item, ret, (indent||0)+1);
+			});
 		}
+		var code_history = [];
+		serialize(root_rec, code_history);
 
-		rows.reverse();
-		callback(rows);
+		callback(code_history);
 	});
 };
 
@@ -268,6 +286,29 @@ Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
 			})
 		});
 	}
+}
+
+exports.sort_paths = function(path_list) {
+	function cmp(a, b) {
+		var x = parseInt(a) - parseInt(b);
+		if (x) return x; // not NaN (strings arent ints) and not zero
+		return a.localeCompare(b);
+	}
+
+	path_list.sort(function(a, b) {
+		// sort quasi-lexicographically, but segmented by
+		// dashes and with integer-looking parts sorted
+		// as integers
+		if (a.name == "index.xml") return -1;
+		if (b.name == "index.xml") return 1;
+		var a = a.name.split("-");
+		var b = b.name.split("-");
+		while (a.length || b.length) {
+			var c = cmp(a.shift(), b.shift());
+			if (c != 0) return c;
+		}
+		return 0;
+	});
 }
 
 Patch.prototype.getPathContent = function(path, with_base_content, callback) {
