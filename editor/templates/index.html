@@ -22,7 +22,7 @@
 							<div><a href="{{row.edit_url}}/_new">Revise Patch</a></div>
 						{% endif %}
 						{% if row.can_merge_up %}
-							<div><a href="{{row.edit_url}}/_merge_up" onclick="return do_merge_up(this);">Merge with {{row.base_title}}</a></div>
+							<div><a href="{{row.edit_url}}/_merge_up" onclick="return do_merge_up(this);" data-title="{{row.title}}" data-base_title="{{row.base_title}}">Merge with {{row.base_title}}</a></div>
 						{% endif %}
 						{% if not row.modify_with_new_patch and row.indent > 0 %}
 							<div><a href="{{row.edit_url}}/_new">New Patch</a></div>
@@ -39,11 +39,16 @@
 {% block scripts %}
 <script>
 function do_merge_up(elem) {
-	ajax_call(
-		elem.getAttribute('href'),
-		{ },
-		function(res) { window.location.reload(); },
-		"Merge Patch with Parent");
+	show_modal_yes_no_question(
+		"Merge Patches",
+		"Are you sure you want to merge " + elem.getAttribute("data-title") + " into " + elem.getAttribute("data-base_title") + "?",
+		function() {
+			ajax_call(
+				elem.getAttribute('href'),
+				{ },
+				function(res) { window.location.reload(); },
+				"Merge Patch with Parent");
+		})
 	return false;
 }
 

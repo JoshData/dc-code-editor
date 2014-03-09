@@ -1,7 +1,28 @@
+var global_modal_ok_func = null;
+
+$(function() {
+	$('#global_modal .btn-danger').click(function() {
+		if (global_modal_ok_func)
+			global_modal_ok_func();
+	})
+})
+
 function show_modal_error(title, message) {
-	$('#error_modal h4').text(title);
-	$('#error_modal p').text(message);
-	$('#error_modal').modal({});
+	$('#global_modal h4').text(title);
+	$('#global_modal p').text(message);
+	$('#global_modal .btn-default').show().text("OK");
+	$('#global_modal .btn-danger').hide();
+	global_modal_ok_func = null;
+	$('#global_modal').modal({});
+}
+
+function show_modal_yes_no_question(title, question, yes_callback) {
+	$('#global_modal h4').text(title);
+	$('#global_modal p').text(question);
+	$('#global_modal .btn-default').show().text("No");
+	$('#global_modal .btn-danger').show().text("Yes");
+	global_modal_ok_func = yes_callback;
+	$('#global_modal').modal({});
 }
 
 function ajax_call(url, data, success_callback, modal_error_title) {
