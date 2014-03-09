@@ -88,27 +88,30 @@ exports.getTree = function(callback) {
 		// depth to least depth so that we know which child of
 		// a patch is most likely the main line and which is
 		// a side patch waiting to be merged.
-		function add_children(patch, is_root) {
+		function add_children(patch) {
 			var rec = {
 				id: patch.id,
 				uuid: patch.uuid,
+				type: patch.type,
 				title: patch.title,
 				edit_url: patch.edit_url,
 				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
-				is_root: is_root,
+				can_merge_up: false, 
 				depth: 0,
 				children: []
 			};
 			for (var i in patch.children) {
 				var child = uuid_map[patch.children[i]];
 				child = add_children(child);
+				child.base_title = rec.title;
+				child.can_merge_up = (patch.type != "root"); // if base isn't root, and a child is never a root
 				rec.children.push(child);
 				if (child.depth + 1 > rec.depth) rec.depth = child.depth+1;
 			}
 			rec.children.sort(function(a,b) { b.depth-a.depth });
 			return rec;
 		}
-		var root_rec = add_children(root_patch, true);
+		var root_rec = add_children(root_patch);
 
 		// pull out the first child of each patch to make a list, and have the
 		// remaining children of each patch be children.
@@ -486,7 +489,7 @@ Patch.prototype.delete = function(callback, force) {
 								child_patch.base = patch.base;
 								child_patch.save();
 
-								// and finally signals that this work is done.
+								// and finally signal that this work is done.
 								callback();
 							});
 						},
@@ -496,14 +499,16 @@ Patch.prototype.delete = function(callback, force) {
 
 				update_base: function(callback) {
 					// if this patch has a base, update the base to remove the reference to
-					// this patch as a child.
-					if (patch.type != "patch") {
+					// this patch as a child and add in this patch's children.
+					if (patch.type == "root") {
 						// root patches don't have a base
 						callback();
 						return;
 					}
 					patch.getBase(function(base_patch) {
-						base_patch.children = base_patch.children.filter(function(child_uuid) { return child_uuid != patch.uuid });
+						base_patch.children =
+							base_patch.children.filter(function(child_uuid) { return child_uuid != patch.uuid })
+							.concat(patch.children);
 						base_patch.save();
 						callback();
 					});
@@ -756,10 +761,13 @@ Patch.prototype.save_rebase = function(rebase_data, callback) {
 
 Patch.prototype.merge_up = function(callback) {
 	/* Merges a patch with its parent, rebasing any other children of the parent. 
-	   This patch may not have any children. */
+	   If this patch has children, the children's base is chnaged to be this
+	   patch's base. */
 
-	if (this.type == "root") throw "Cannot merge up a root patch."
-	if (this.children.length > 0) throw "Cannot merge up a patch that has children."
+	if (this.type == "root") {
+		callback("Cannot merge up a root patch.");
+		return;
+	}
 
 	var patch = this;
 
@@ -767,6 +775,12 @@ Patch.prototype.merge_up = function(callback) {
 	patch.get_jot_operations(function(patch_as_jot_op) {
 		// Now attempt to rebase each sibling tree in parallel.
 		patch.getBase(function(base_patch) {
+			// Can't merge into the root patch either.
+			if (base_patch.type == "root") {
+				callback("Cannot merge into a root patch.");
+				return;
+			}
+
 			// get the other children of base_patch
 			var sibling_uuids = base_patch.children.filter(function(item) { return item != patch.uuid });
 
@@ -799,7 +813,12 @@ Patch.prototype.merge_up = function(callback) {
 						function() {
 							// no error is possible
 
-							// delete the patch
+							// Delete the patch, with force=true (it's the argument after the callback)
+							// so that the method skips the check if any paths were modified. Since the
+							// base patch has been modified in place, this patch's state is already
+							// inconsistent anyway. Deleting also has the effect of re-setting the patch's
+							// children's bases to be this patch's base rather than this patch itself,
+							// which is good. But note how this creates new siblings.
 							patch.delete(function(err) {
 								if (err) {
 									callback("Really bad error while deleting the patch: " + err + " Workspace is possibly corrupted.");
@@ -807,7 +826,10 @@ Patch.prototype.merge_up = function(callback) {
 								}
 
 								// Now that the base patch has been updated, apply the rebased operations
-								// computed above to update the patch content of the siblings.
+								// computed above to update the patch content of the siblings. Use the same
+								// list of siblings from above a) because it's in the same order as
+								// sibling_rebase_data, and b) after patch.delete() the patch may have
+								// new siblings.
 								async.map(
 									Object.keys(sibling_uuids), // => array indexes
 									function(i, callback) {
@@ -820,7 +842,7 @@ Patch.prototype.merge_up = function(callback) {
 										callback(err);
 									}
 								);
-							});
+							}, true); // 'true' is the force callback to delete()
 						}
 					);
 				}

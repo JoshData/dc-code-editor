@@ -4,24 +4,28 @@
 
 {% block body %}
 <div class="container">
-	<h1>Start a New Patch</h1>
-
-	<p>Start a <a href="{{head_patch.edit_url}}/_new">new patch</a> based on the text of the top-most patch.</p>
-
 	<h1>Timeline</h1>
 
 	<div id="timeline">
 		<div class="uparrow"> </div>
+		<div class="timeline-row">
+			<div class="timeline-patch">
+				<a href="{{head_patch.edit_url}}/_new" style="font-style: italic">Start New Patch</a>
+			</div>
+		</div>
 		{% for row in patch_tree %}
 			<div class="timeline-row">
-				<div class="timeline-patch {% if row.is_root %}root{% endif %}" style="margin-left: {{row.indent * 2}}em">
+				<div class="timeline-patch {% if row.type == "root" %}root{% endif %}" style="margin-left: {{row.indent * 2}}em">
 					<div class="timeline-patch-anchor"><a href="{{row.edit_url}}">{{row.title}}</a></div>
 					<div class="timeline-patch-metadata">
 						{% if row.modify_with_new_patch %}
 							<div><a href="{{row.edit_url}}/_new">Revise Patch</a></div>
 						{% endif %}
-						{% if row.indent > 0 %}
-							<div><a href="{{row.edit_url}}/_merge_up" onclick="return do_merge_up(this);">Merge with Parent</a></div>
+						{% if row.can_merge_up %}
+							<div><a href="{{row.edit_url}}/_merge_up" onclick="return do_merge_up(this);">Merge with {{row.base_title}}</a></div>
+						{% endif %}
+						{% if not row.modify_with_new_patch and row.indent > 0 %}
+							<div><a href="{{row.edit_url}}/_new">New Patch</a></div>
 						{% endif %}
 					</div>
 				</div>
