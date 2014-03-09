@@ -158,6 +158,15 @@ exports.set_routes = function(app) {
 	app.post('/render-body', function(req, res){
 		// Use simple-2 to render a preview of the page.
 
+		if (req.body.text == "") {
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify({
+				"status": "ok",
+				"html": "<i>The file is now empty and will be deleted from the code.</i>"
+			}));
+			return;
+		}
+
 		// We're passed the current contents of the file. Parse the XML.
 		var et = require('elementtree');
 

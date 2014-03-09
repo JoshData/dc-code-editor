@@ -1,6 +1,6 @@
 var fs = require("fs");
 var glob = require("glob");
-var path = require("path");
+var pathlib = require("path");
 var clone = require('clone');
 var uuid = require('node-uuid');
 var async = require('async');
@@ -36,7 +36,7 @@ function getAllPatchIds(callback) {
 	var patch_index_files = glob.sync(settings.workspace_directory + "/*/index.json");
 	if (patch_index_files.length > 0) {
 		callback(patch_index_files.map(function(item) {
-			return path.basename(path.dirname(item));
+			return pathlib.basename(pathlib.dirname(item));
 		}));
 		return;
 	}
@@ -281,11 +281,41 @@ Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
 	} else {
 		// Get the files in the base patch, never including files
 		// deleted in the base patch.
+		var patch = this;
 		this.getBase(function(base) {
 			base.getPaths(path, false, function(entries) {
-				// TODO: Modify according to the added and removed files in
+				// Turn the entries into an object keyed by filename.
+				var ret = { };
+				entries.forEach(function(item) { ret[item.name] = item });
+
+				// Modify according to any added and removed files in
 				// this patch.
-				callback(entries);
+				for (var entry in patch.files) {
+					// Just look at entries that are immediate children of the requested path.
+					if (pathlib.dirname(entry) == path || (path == null && pathlib.dirname(entry) == '.')) {
+						var name = pathlib.basename(entry);
+						if (patch.files[entry].method == "null" && !with_deleted_files) {
+							// This path is deleted, and we're supposed to reflect that in the return value.
+							if (name in ret)
+								delete ret[name];
+						} else {
+							ret[name] = {
+								type: 'blob',
+								name: name
+							};
+						}
+					}
+
+					// TODO: Or if there is a path (except deletions) that are in a subpath of
+					// the requested path, add in new directories.
+
+					// TOOD: How would deleted directories be reflected?
+				}
+
+				// Turn the object back into an array.
+				ret = Object.keys(ret).map(function(key) { return ret[key] });
+
+				callback(ret);
 			})
 		});
 	}
@@ -329,11 +359,19 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 	} else {
 		var dirname = settings.workspace_directory + "/" + this.id;
 
-		if ((path in this.files) && this.files[path].method == "raw" && !with_base_content) {
+		if ((path in this.files) && !with_base_content) {
 			// If the entire new content is stored raw, and the caller doesn't need
 			// the base content, just load the file and return.
-			fs.readFile(dirname + "/" + this.files[path].storage, { encoding: "utf8" }, function(err, data) { if (err) throw err; callback(null, data); });
-			return;
+			if (this.files[path].method == "raw") {
+				fs.readFile(dirname + "/" + this.files[path].storage, { encoding: "utf8" }, function(err, data) { if (err) throw err; callback(null, data); });
+				return;
+			}
+
+			// Similarly, if the file was deleted, return empty content.
+			if (this.files[path].method == "null") {
+				callback(null, "");
+				return;
+			}
 		}
 
 		// Ask the base revision for its current content. We don't need *its* base.
@@ -344,6 +382,10 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 					// This file is modified by the patch.
 					if (patch.files[path].method == "raw") {
 						fs.readFile(dirname + "/" + patch.files[path].storage, { encoding: "utf8" }, function(err, data) { if (err) throw err; callback(base_content, data); });
+						return;
+					}
+					if (patch.files[path].method == "null") {
+						callback(base_content, "");
 						return;
 					}
 				}
@@ -363,18 +405,38 @@ Patch.prototype.writePathContent = function(path, new_content, override_checks) 
 
   	var needs_save = false;
 
-	if (!(path in this.files)) {
-		// How should we store the changes on disk?
+  	if (new_content == "") {
+  		// Empty content flags a deleted file.
+  		// Save with the "null" storage type. Flagging the content as null
+  		// here makes it easy to check whether the path is deleted elsewhere.
+
+		if ((path in this.files) && this.files[path].method == "raw") {
+			// Delete the storage from disk.
+			fs.unlinkSync(settings.workspace_directory + "/" + this.id + "/" + this.files[path].storage);
+		}
+
 		this.files[path] = {
-			storage: path.replace(/\//g, "_"),
-			method: "raw"
+			method: "null"
 		};
 		needs_save = true;
-	}
 
-	fs.writeFileSync(
-		settings.workspace_directory + "/" + this.id + "/" + this.files[path].storage,
-		new_content);
+  	} else {
+  		// Save the content with the "raw" method, which means we dump the
+  		// contents of the file into a file.
+
+		if (!(path in this.files)) {
+			// How should we store the changes on disk?
+			this.files[path] = {
+				storage: path.replace(/\//g, "_"),
+				method: "raw"
+			};
+			needs_save = true;
+		}
+
+		fs.writeFileSync(
+			settings.workspace_directory + "/" + this.id + "/" + this.files[path].storage,
+			new_content);
+  	}
 
 	if (needs_save)
 		this.save();
