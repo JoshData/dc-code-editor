@@ -57,7 +57,7 @@ function getAllPatchIds(callback) {
 	// code as of what's given in the base code directory.
 	repo.get_repository_head(function(hash) {
 		new_patch_internal(new Patch({
-			"id": "root",
+			"id": "git-" + hash,
 			"type": "root",
 			"hash": hash,
 		}));
@@ -279,7 +279,7 @@ Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
 
 	if (this.type == "root") {
 		// Go to the repository to get the files in the indicated path.
-		repo.ls(null, path, callback);
+		repo.ls(this.hash, path, callback);
 	} else {
 		// Get the files in the base patch, never including files
 		// deleted in the base patch.
@@ -399,11 +399,12 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 		// the file is created to get base content. Let this happen but just send
 		// an empty string. If we don't check first, git returns a non-zero exit
 		// status trying to cat the contents and an exception is thrown.
+		var myhash = this.hash;
 		this.pathExists(path, false, function(exists) {
 			if (!exists)
 				callback(null, "");
 			else
-				repo.cat(null, path, function(blob) { callback(null, blob); } );
+				repo.cat(myhash, path, function(blob) { callback(null, blob); } );
 		});
 	} else {
 		var dirname = settings.workspace_directory + "/" + this.id;

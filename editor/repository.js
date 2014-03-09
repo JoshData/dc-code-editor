@@ -23,7 +23,7 @@ function execute_git(args, callback) {
 	  output += data;
 	});
 	git.on('close', function(exit_code) {
-		if (exit_code != 0) throw "git returned non-zero exit status";
+		if (exit_code != 0) throw "git returned non-zero exit status, parameters were " + args;
 		callback(output);
 	});
 }
@@ -42,30 +42,24 @@ exports.ls_hash = function(hash, recursive, callback) {
 	// with an array of directory entries, each an object with 'name', 'hash', 'type',
 	// and 'size' properties. Type is 'blob' (file) or 'tree' (directory). To move to
 	// a subdirectory, pass the hash associated with the subdirectory entry.
-	if (!hash) {
-		exports.get_repository_head(function(head_hash) {
-			exports.ls_hash(head_hash, recursive, callback);
+	execute_git(["ls-tree", "-lz" + (recursive ? 'r' : ''), hash],
+	function(output) {
+		var raw_entries = output.split("\0");
+		var entries = [];
+		raw_entries.forEach(function(item) {
+			if (item.length == 0) return;
+			item = item.split("\t");
+			var filename = item[1];
+			item = item[0].split(" ");
+			entries.push({
+				type: item[1],
+				hash: item[2],
+				size: item[3],
+				name: filename
+			})
 		});
-	} else {
-		execute_git(["ls-tree", "-lz" + (recursive ? 'r' : ''), hash],
-		function(output) {
-			var raw_entries = output.split("\0");
-			var entries = [];
-			raw_entries.forEach(function(item) {
-				if (item.length == 0) return;
-				item = item.split("\t");
-				var filename = item[1];
-				item = item[0].split(" ");
-				entries.push({
-					type: item[1],
-					hash: item[2],
-					size: item[3],
-					name: filename
-				})
-			});
-			callback(entries);
-		});
-	}
+		callback(entries);
+	});
 }
 
 exports.ls = function(hash, path, callback) {
@@ -97,11 +91,5 @@ exports.cat_hash = function(hash, callback) {
 
 exports.cat = function(hash, path, callback) {
 	// Gets the (string) content of a blob, i.e. a file, given its hash.
-	if (!hash) {
-		exports.get_repository_head(function(head_hash) {
-			exports.cat(head_hash, path, callback);
-		});
-	} else {
-		execute_git(["show", hash + ":" + path], callback);
-	}
+	execute_git(["show", hash + ":" + path], callback);
 }
