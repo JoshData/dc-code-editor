@@ -141,7 +141,7 @@ exports.set_routes = function(app) {
 		var filename = req.body.file;
 		var newtext = req.body.text;
 
-		if (patch.type == "root" || patch.children.length > 0)
+		if (!patch.can_modify)
 			throw "Cannot modify a root patch or a patch that has children.";
 
 		newtext = tabs_to_spaces(newtext);
@@ -151,6 +151,33 @@ exports.set_routes = function(app) {
 		res.setHeader('Content-Type', 'application/json');
 		res.send(JSON.stringify({
 			"status": "ok",
+		}));
+	});
+
+	// Create a new modified path in a patch. Actually there's nothing to do
+	// but redirect to the editor.
+	app.post('/new-patch-file', function(req, res){
+		var patch = patches.Patch.load(req.body.patch);
+		var filename = req.body.file;
+
+		res.setHeader('Content-Type', 'application/json');
+
+		// Check the file name is valid. Check each directory/base name in the path,
+		// since slashes have to be excluded from the check.
+		var path_parts = filename.split("/");
+		for (var i = 0; i < path_parts.length; i++) {
+			if (patches.disallowed_filename_chars.test(path_parts[i])) {
+				res.send(JSON.stringify({
+					"status": "error",
+					"msg": "A file name may only contain letters, numbers, dashes, underscores, periods, and tildes."
+				}));
+				return;
+			}
+		}
+
+		res.send(JSON.stringify({
+			"status": "ok",
+			"redirect": patch.edit_url + "/editor?file=" + filename
 		}));
 	});
 

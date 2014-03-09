@@ -9,6 +9,8 @@ var jsdiff = require('diff');
 var repo = require("./repository.js");
 var settings = require("./settings.js");
 
+exports.disallowed_filename_chars = /[^A-Za-z0-9\-_\.\~]/;
+
 /*
  * Class declaration for a Patch instance.
  * This should only be called by internal functions in this
@@ -218,7 +220,7 @@ Patch.load = function(patch_id) {
 	patch.id = patch_id;
 	patch.title = patch_id; // maybe override this later
 	patch.edit_url = "/patch/" + patch_id;
-	if (patch.type != "root") patch.can_modify = true;
+	if (patch.type != "root" && patch.children == 0) patch.can_modify = true;
 
 	// parse some fields
 	patch.created = new Date(patch.created);
@@ -344,6 +346,43 @@ exports.sort_paths = function(path_list) {
 	});
 }
 
+Patch.prototype.pathExists = function(path, with_deleted_files, callback) {
+	/* Checks if a path is present in this patch. If with_deleted_files, returns
+	   true even if the path is deleted in this patch. */
+
+	// First check if the path is modified in this patch. If it has content,
+	// it exists. If it is being deleted, then it exists just when the caller
+	// wants to include deleted files.
+	if (path in this.files) {
+		if (this.files[path].method == "raw")
+			callback(true);
+		else if (this.files[path].method == "null")
+			callback(with_deleted_files);
+		else
+			throw "unhandled case"
+		return;
+	}
+
+	// The path isn't modified in this patch but it may or may not still exist.
+	// Don't look at the base patch in case this is the root patch. Just look
+	// at the paths that exist in this patch.
+	var up_path = pathlib.dirname(path);
+	if (up_path == ".") up_path = null;
+	var fn = pathlib.basename(path);
+	this.getPaths(
+		up_path,
+		true, /* include files deleted in this patch, though we would have handled that case above */
+		function(entries) {
+			for (var i = 0; i < entries.length; i++) {
+				if (entries[i].name == fn) {
+					callback(true);
+					return;
+				}
+			}
+			callback(false);
+		});
+}
+
 Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 	/* Gets the content of a path after this patch is applied, and if
 	   with_base_content is true then we also provide the base content,
@@ -355,7 +394,17 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 	if (this.type == "root") {
 		// Go to the repository to get the files in the indicated path.
 		if (with_base_content) throw "Cannot set with_base_content=true on a root patch.";
-		repo.cat(null, path, function(blob) { callback(null, blob); } );
+
+		// When inserting new files, we end up looking at patches from when before
+		// the file is created to get base content. Let this happen but just send
+		// an empty string. If we don't check first, git returns a non-zero exit
+		// status trying to cat the contents and an exception is thrown.
+		this.pathExists(path, false, function(exists) {
+			if (!exists)
+				callback(null, "");
+			else
+				repo.cat(null, path, function(blob) { callback(null, blob); } );
+		});
 	} else {
 		var dirname = settings.workspace_directory + "/" + this.id;
 
@@ -403,12 +452,12 @@ Patch.prototype.writePathContent = function(path, new_content, override_checks) 
 
 	if (!override_checks && (this.type == "root" || this.children.length > 0)) throw "Cannot modify the content of a root patch or a patch that has children!"
 
-  	var needs_save = false;
+	var needs_save = false;
 
-  	if (new_content == "") {
-  		// Empty content flags a deleted file.
-  		// Save with the "null" storage type. Flagging the content as null
-  		// here makes it easy to check whether the path is deleted elsewhere.
+	if (new_content == "") {
+		// Empty content flags a deleted file.
+		// Save with the "null" storage type. Flagging the content as null
+		// here makes it easy to check whether the path is deleted elsewhere.
 
 		if ((path in this.files) && this.files[path].method == "raw") {
 			// Delete the storage from disk.
@@ -420,9 +469,9 @@ Patch.prototype.writePathContent = function(path, new_content, override_checks) 
 		};
 		needs_save = true;
 
-  	} else {
-  		// Save the content with the "raw" method, which means we dump the
-  		// contents of the file into a file.
+	} else {
+		// Save the content with the "raw" method, which means we dump the
+		// contents of the file into a file.
 
 		if (!(path in this.files)) {
 			// How should we store the changes on disk?
@@ -436,7 +485,7 @@ Patch.prototype.writePathContent = function(path, new_content, override_checks) 
 		fs.writeFileSync(
 			settings.workspace_directory + "/" + this.id + "/" + this.files[path].storage,
 			new_content);
-  	}
+	}
 
 	if (needs_save)
 		this.save();
@@ -463,9 +512,8 @@ Patch.prototype.rename = function(new_id, callback) {
 	// we don't have to worry about broken references.
 
 	// First test that this is a valid name.
-	var disallowed_chars = /[^A-Za-z0-9\-_]/;
-	if (disallowed_chars.test(new_id)) {
-		callback("Patch names may only contain letters, numbers, dashes, and underscores. Spaces are not allowed.")
+	if (exports.disallowed_filename_chars.test(new_id)) {
+		callback("Patch names may only contain letters, numbers, dashes, underscores, periods, and tildes. Spaces are not allowed.")
 		return;
 	}
 
