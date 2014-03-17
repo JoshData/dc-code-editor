@@ -36,7 +36,7 @@ Run
 
 	node editor/index.js
 
-or
+or to have the editor restart after any code changes use:
 
 	npm install -g supervisor
 	./run

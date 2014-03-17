@@ -95,7 +95,6 @@ exports.getTree = function(callback) {
 				id: patch.id,
 				uuid: patch.uuid,
 				type: patch.type,
-				title: patch.title,
 				edit_url: patch.edit_url,
 				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
 				can_merge_up: false, 
@@ -105,7 +104,7 @@ exports.getTree = function(callback) {
 			for (var i in patch.children) {
 				var child = uuid_map[patch.children[i]];
 				child = add_children(child);
-				child.base_title = rec.title;
+				child.base_id = rec.id;
 				child.can_merge_up = (patch.type != "root"); // if base isn't root, and a child is never a root
 				rec.children.push(child);
 				if (child.depth + 1 > rec.depth) rec.depth = child.depth+1;
@@ -218,7 +217,6 @@ Patch.load = function(patch_id) {
 
 	// fill in some things
 	patch.id = patch_id;
-	patch.title = patch_id; // maybe override this later
 	patch.edit_url = "/patch/" + patch_id;
 	if (patch.type != "root" && patch.children == 0) patch.can_modify = true;
 
@@ -790,7 +788,7 @@ Patch.prototype.compute_rebase = function(jot_op, callback) {
 		var result = jot_base.rebase_array(jot_op, this_as_jot_op);
 		var inverse_result = jot_base.rebase_array(this_as_jot_op, jot_op);
 		if (!result || !inverse_result) {
-			callback("The changes conflict with the changes in patch " + patch.title + ".");
+			callback("The changes conflict with the changes in patch " + patch.id + ".");
 			return;
 		}
 
@@ -842,8 +840,6 @@ Patch.prototype.save_rebase = function(rebase_data, callback) {
 			// contents.
 			var changed_path = applyop.key;
 			patch.getPathContent(changed_path, true, function(base_content) {
-				console.log(patch.title, changed_path, applyop.op);
-				console.log(base_content);
 				var rebased_content = jot_base.apply(applyop.op, base_content);
 				patch.writePathContent(changed_path, rebased_content, true); // 'true' overrides sanity checks, since usually we are not allowed to write to patches with children
 				callback(); // no errror & nothing to return

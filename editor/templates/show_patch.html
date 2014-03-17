@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{patch.get_display_title}}{% endblock %}
+{% block title %}{{patch.id}}{% endblock %}
 
 {% block body %}
 <div class="container">
@@ -9,7 +9,7 @@
 		|
 		<span>delete</span>
 	</p>
-	<h1 style="margin-top: 0">{{patch.title}}</h1>
+	<h1 style="margin-top: 0">{{patch.id}}</h1>
 
 	<div class="row">
 		{% if patch.type != "root" %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{filename}} -- {{patch.title}}{% endblock %}
+{% block title %}{{filename}} -- {{patch.id}}{% endblock %}
 
 {% block head %}
 <!-- Create a simple CodeMirror instance -->
@@ -14,7 +14,7 @@
 <div class="container-fluid">
 
 	<p style="margin: 0">
-		<a href="{{patch.edit_url}}">&lt; {{patch.title}}</a>
+		<a href="{{patch.edit_url}}">&lt; {{patch.id}}</a>
 	</p>
 	<h1 style="margin: 0">{{filename}}</h1>
 

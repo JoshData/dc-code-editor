@@ -13,19 +13,19 @@
 				<a href="{{head_patch.edit_url}}/_new" style="font-style: italic">Start New Patch</a>
 			</div>
 		</div>
-		{% for row in patch_tree %}
+		{% for patch in patch_tree %}
 			<div class="timeline-row">
-				<div class="timeline-patch {% if row.type == "root" %}root{% endif %}" style="margin-left: {{row.indent * 2}}em">
-					<div class="timeline-patch-anchor"><a href="{{row.edit_url}}">{{row.title}}</a></div>
+				<div class="timeline-patch {% if patch.type == "root" %}root{% endif %}" style="margin-left: {{patch.indent * 2}}em">
+					<div class="timeline-patch-anchor"><a href="{{patch.edit_url}}">{{patch.id}}</a></div>
 					<div class="timeline-patch-metadata">
-						{% if row.modify_with_new_patch %}
-							<div><a href="{{row.edit_url}}/_new">Revise Patch</a></div>
+						{% if patch.modify_with_new_patch %}
+							<div><a href="{{patch.edit_url}}/_new">Revise Patch</a></div>
 						{% endif %}
-						{% if row.can_merge_up %}
-							<div><a href="{{row.edit_url}}/_merge_up" onclick="return do_merge_up(this);" data-title="{{row.title}}" data-base_title="{{row.base_title}}">Merge with {{row.base_title}}</a></div>
+						{% if patch.can_merge_up %}
+							<div><a href="{{patch.edit_url}}/_merge_up" onclick="return do_merge_up(this);" data-title="{{patch.id}}" data-base_title="{{patch.base_id}}">Merge with {{patch.base_id}}</a></div>
 						{% endif %}
-						{% if not row.modify_with_new_patch and row.indent > 0 %}
-							<div><a href="{{row.edit_url}}/_new">New Patch</a></div>
+						{% if not patch.modify_with_new_patch and patch.indent > 0 %}
+							<div><a href="{{patch.edit_url}}/_new">New Patch</a></div>
 						{% endif %}
 					</div>
 				</div>
