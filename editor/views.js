@@ -21,7 +21,7 @@ exports.set_routes = function(app) {
 	});
 
 	// Patch Edit
-	var show_patch_template = swig.compileFile(__dirname + '/templates/show_patch.html');
+	var show_patch_template = swig.compileFile(__dirname + '/templates/patch.html');
 	app.get('/patch/:patch', function(req, res){
 		res.setHeader('Content-Type', 'text/html');
 
@@ -112,7 +112,7 @@ exports.set_routes = function(app) {
 	}
 
 	// File Edit
-	var edit_file_template = swig.compileFile(__dirname + '/templates/edit_file.html');
+	var edit_path_template = swig.compileFile(__dirname + '/templates/path.html');
 	app.get('/patch/:patch/editor', function(req, res){
 		res.setHeader('Content-Type', 'text/html');
 		var patch = patches.Patch.load(req.params.patch);
@@ -124,7 +124,7 @@ exports.set_routes = function(app) {
 			if (has_base_text) base_text = spaces_to_tabs(base_text);
 			current_text = spaces_to_tabs(current_text);
 
-			res.send(edit_file_template({
+			res.send(edit_path_template({
 				patch: patch,
 				readonly: !has_base_text || (patch.children.length > 0),
 				filename: filename,
