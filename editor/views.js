@@ -51,6 +51,7 @@ exports.set_routes = function(app) {
 			res.send(show_patch_template({
 				patch: patch,
 				readonly: (patch.type == "root") || (patch.children.length > 0),
+				notes: render_patch_notes(patch),
 				files: result.file_list,
 				path: req.query.path,
 				path_up: path_up,
@@ -66,9 +67,10 @@ exports.set_routes = function(app) {
 		res.redirect(patch.edit_url);
 	});
 
-	// Rename/Delete Patch
+	// Rename/Delete/Modify Patch
 	app.post('/patch/:patch/_action', function(req, res){
 		var patch = patches.Patch.load(req.params.patch);
+
 		if (req.body.action == "rename") {
 			var new_id = req.body.value;
 			patch.rename(new_id, function(status, new_patch) {
@@ -86,6 +88,7 @@ exports.set_routes = function(app) {
 				}
 			});
 		}
+
 		if (req.body.action == "delete") {
 			patch.delete(function(status) {
 				res.setHeader('Content-Type', 'application/json');
@@ -102,7 +105,24 @@ exports.set_routes = function(app) {
 				}
 			});
 		}
+
+		if (req.body.action == "notes") {
+			patch.notes = req.body.value;
+			patch.save();
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify({
+				"status": "ok",
+				"markdown": render_patch_notes(patch)
+			}));
+		}
 	});
+
+	function render_patch_notes(patch) {
+		var markdown = require( "markdown" ).markdown;
+		var notes = patch.notes;
+		if (!/\S/.test(notes)) notes = "*no description*";
+		return markdown.toHTML(notes + " EDITLINKSENTINEL").replace("EDITLINKSENTINEL", " [<a href='#' onclick='return edit_patch_notes();'>edit</a>]");
+	}
 
 	function spaces_to_tabs(str) {
 		return str.replace(/\n(  )+/g, function(m) { return "\n" + "\t".repeat((m.length-1)/2); });

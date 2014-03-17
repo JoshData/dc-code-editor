@@ -43,7 +43,7 @@ function getAllPatchIds(callback) {
 		return;
 	}
 
-	// If there are no patches, this is probably the first run.
+	// If there are no patches, this must be the first run.
 
 	// Try to make the workspace directory if it doesn't exist.
 	try {
@@ -53,15 +53,21 @@ function getAllPatchIds(callback) {
 		if (e.code != "EEXIST") throw e;
 	}
 
+	// Create a root patch based on the code repository.
+	createRootPatch(function(patch) { callback([patch.id]); });
+}
+
+function createRootPatch(callback) {
 	// Create a "root patch" that represents the state of the
 	// code as of what's given in the base code directory.
 	repo.get_repository_head(function(hash) {
-		new_patch_internal(new Patch({
-			"id": "git-" + hash,
+		var p = new_patch_internal(new Patch({
+			"id": "root-" + hash.substring(0, 6),
 			"type": "root",
 			"hash": hash,
+			"notes": "The code as committed in " + hash + "."
 		}));
-		callback(["root"]);
+		callback(p);
 	});
 	
 }
@@ -148,6 +154,7 @@ function new_patch_internal(patch) {
 	patch.created = new Date();
 	patch.files = { }; // the actual changes w/in this patch
 	patch.children = [ ]; // UUIDs of children whose base patch is this patch
+	patch.notes = patch.notes || "";
 	patch.save();
 	return Patch.load(patch.id);
 }
