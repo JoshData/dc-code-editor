@@ -97,16 +97,24 @@ exports.getTree = function(callback) {
 		// a patch is most likely the main line and which is
 		// a side patch waiting to be merged.
 		function add_children(patch) {
+			var moment = require('moment');
+
 			var rec = {
 				id: patch.id,
 				uuid: patch.uuid,
 				type: patch.type,
+
 				edit_url: patch.edit_url,
 				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
 				can_merge_up: false, 
+
+				effective_date: patch.effective_date ? moment(patch.effective_date) : null,
+				effective_date_display: patch.effective_date ? moment(patch.effective_date).format("MMMM D, YYYY") : "(Not Set)",
+
 				depth: 0,
 				children: []
 			};
+
 			for (var i in patch.children) {
 				var child = uuid_map[patch.children[i]];
 				child = add_children(child);
@@ -129,8 +137,18 @@ exports.getTree = function(callback) {
 
 			// do the first child first, to make this in reverse chronological order
 			// at the top level
-			if (rec.indent == 0 && children.length > 0)
-				serialize(children.shift(), ret, indent);
+			if (rec.indent == 0 && children.length > 0) {
+				var first_child = children.shift();
+				serialize(first_child, ret, indent);
+
+				// Check that consecutive patches have effective dates that
+				// are in chronological order. If not, set a flag so we can
+				// display a warning.
+				if (rec.effective_date && first_child.effective_date && first_child.effective_date.diff(rec.effective_date) < 0) {
+					rec.date_out_of_order = true;
+					first_child.date_out_of_order = true;
+				}
+			}
 
 			// then the patch itself
 			ret.push(rec);
@@ -155,6 +173,7 @@ function new_patch_internal(patch) {
 	patch.files = { }; // the actual changes w/in this patch
 	patch.children = [ ]; // UUIDs of children whose base patch is this patch
 	patch.notes = patch.notes || "";
+	patch.effective_date = patch.effective_date || null;
 	patch.save();
 	return Patch.load(patch.id);
 }

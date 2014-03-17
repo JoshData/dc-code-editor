@@ -115,6 +115,15 @@ exports.set_routes = function(app) {
 				"markdown": render_patch_notes(patch)
 			}));
 		}
+
+		if (req.body.action == "effdate") {
+			patch.effective_date = req.body.value;
+			patch.save();
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify({
+				"status": "ok"
+			}));
+		}
 	});
 
 	function render_patch_notes(patch) {

@@ -12,6 +12,7 @@
 
         <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
         <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
+        <link rel="stylesheet" href="/static/bootstrap-datepicker.css">
         <link rel="stylesheet" href="/static/main.css">
         <script src="/static/modernizr-2.6.2-respond-1.1.0.min.js"></script>
 
@@ -56,6 +57,7 @@
         <script>$(document).ajaxSend(function(event, xhr, settings) { if (!/^https?:.*/.test(settings.url)) xhr.setRequestHeader("X-CSRFToken", "{{csrf_token}}"); });</script>
 
         <script src="/static/bootstrap/js/bootstrap.min.js"></script>
+        <script src="/static/bootstrap-datepicker.js"></script>
         <script src="/static/main.js"></script>
 
         {% block scripts %}

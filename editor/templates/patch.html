@@ -11,17 +11,27 @@
 	</p>
 	<h1 style="margin-top: 0">{{patch.id}}</h1>
 
-	<div id="notes">
-		{{notes|safe}}
-	</div>
-	<div id="notes-edit" style="display: none">
-		<form role="form" onsubmit="return do_edit_notes_save();">
-		  <div class="form-group">
-		    <label for="notesTextarea">Patch Description</label>
-		    <textarea class="form-control" id="notesTextarea" rows="5">{{patch.notes}}</textarea>
-		  </div>
-		  <button type="submit" class="btn btn-default">Save</button>
-		</form>				
+	<div class="row" style="padding: 1.5em 0;">
+		<div class="col-sm-3">
+			<label for="patchEffectiveDate">Effective Date:</label>
+		  	<div class="input-group date" style="width: 12em">
+		  		<input id="patchEffectiveDate" type="text" class="form-control" readonly="1"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+		  	</div>
+	  	</div>
+	  	<div class="col-sm-9">
+		    <label for="notesTextarea">Patch Description:</label>
+			<div id="notes">
+				{{notes|safe}}
+			</div>
+			<div id="notes-edit" style="display: none">
+				<form role="form" onsubmit="return do_edit_notes_save();">
+				  <div class="form-group">
+				    <textarea class="form-control" id="notesTextarea" rows="5">{{patch.notes}}</textarea>
+				  </div>
+				  <button type="submit" class="btn btn-default">Save</button>
+				</form>				
+			</div>
+	  	</div>
 	</div>
 
 	<div class="row">
@@ -104,9 +114,34 @@
 {% block scripts %}
 <script>
 	$(function() {
+
 		$('#patch_actions span').css({cursor: "pointer"}).click(function() {
 			patch_action($(this).text());
 		});
+
+		$('.input-group.date').datepicker({
+		    format: "mm/dd/yyyy",
+		    todayBtn: "linked",
+		    autoclose: true,
+		    clearBtn: true
+		})
+		{% if patch.effective_date %}.datepicker("setUTCDate", new Date("{{patch.effective_date}}")){% endif %} // the UI is sort of in UTC, so assume the date is UTC going in (or else we may see a different date displayed)
+		.on("changeDate", function(e) {
+			var value = null;
+			if (e.date) // not cleared
+				value = e.date.toISOString().replace(/T.*/, '');
+			ajax_call(
+				"{{patch.edit_url}}/_action",
+				{
+	  				action: "effdate",
+	  				value: value
+	  			},
+				function(res) { },
+				"Effective Date");
+			return false;
+
+		});
+
 	});
 
 	function patch_action(action) {

@@ -13,3 +13,6 @@
 [submodule "ext/jot"]
 	path = ext/jot
 	url = https://github.com/JoshData/jot
+[submodule "ext/bootstrap-datepicker"]
+	path = ext/bootstrap-datepicker
+	url = https://github.com/eternicode/bootstrap-datepicker
