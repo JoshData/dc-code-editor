@@ -13,7 +13,10 @@
 				<a href="{{head_patch.edit_url}}/_new" style="font-style: italic">Start New Patch</a>
 			</div>
 		</div>
-		{% for patch in patch_tree %}
+		<div id="timeline-patches">
+		{% for patch_array in patch_tree %}
+		<div class="timeline-group" data-patch-id="{{patch_array[0].id}}">
+		{% for patch in patch_array %}
 			<div class="timeline-row">
 				<div class="timeline-patch {% if patch.type == "root" %}root{% endif %}" style="margin-left: {{patch.indent * 2}}em">
 					<div class="timeline-patch-anchor"><a href="{{patch.edit_url}}">{{patch.id}}</a></div>
@@ -32,6 +35,9 @@
 				</div>
 			</div>
 		{% endfor %}
+		</div>
+		{% endfor %}
+		</div>
 	</div>
 </div>
 

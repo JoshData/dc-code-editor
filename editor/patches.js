@@ -97,20 +97,8 @@ exports.getTree = function(callback) {
 		// a patch is most likely the main line and which is
 		// a side patch waiting to be merged.
 		function add_children(patch) {
-			var moment = require('moment');
-
 			var rec = {
-				id: patch.id,
-				uuid: patch.uuid,
-				type: patch.type,
-
-				edit_url: patch.edit_url,
-				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
-				can_merge_up: false, 
-
-				effective_date: patch.effective_date ? moment(patch.effective_date) : null,
-				effective_date_display: patch.effective_date ? moment(patch.effective_date).format("MMMM D, YYYY") : "(Not Set)",
-
+				patch: patch,
 				depth: 0,
 				children: []
 			};
@@ -118,8 +106,7 @@ exports.getTree = function(callback) {
 			for (var i in patch.children) {
 				var child = uuid_map[patch.children[i]];
 				child = add_children(child);
-				child.base_id = rec.id;
-				child.can_merge_up = (patch.type != "root"); // if base isn't root, and a child is never a root
+				child.base_patch = patch;
 				rec.children.push(child);
 				if (child.depth + 1 > rec.depth) rec.depth = child.depth+1;
 			}
@@ -128,39 +115,72 @@ exports.getTree = function(callback) {
 		}
 		var root_rec = add_children(root_patch);
 
-		// pull out the first child of each patch to make a list, and have the
-		// remaining children of each patch be children.
-		function serialize(rec, ret, indent) {
-			var children = rec.children;
-			delete rec.children;
-			rec.indent = (indent||0);
+		function patch_for_template(patch, base_patch, depth) {
+			var moment = require('moment');
+			return {
+				indent: depth,
 
-			// do the first child first, to make this in reverse chronological order
-			// at the top level
-			if (rec.indent == 0 && children.length > 0) {
-				var first_child = children.shift();
-				serialize(first_child, ret, indent);
+				id: patch.id,
+				uuid: patch.uuid,
+				type: patch.type,
+				base_id: base_patch ? base_patch.id : null,
 
-				// Check that consecutive patches have effective dates that
-				// are in chronological order. If not, set a flag so we can
-				// display a warning.
-				if (rec.effective_date && first_child.effective_date && first_child.effective_date.diff(rec.effective_date) < 0) {
-					rec.date_out_of_order = true;
-					first_child.date_out_of_order = true;
-				}
+				edit_url: patch.edit_url,
+				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
+				can_merge_up: base_patch != null && base_patch.type == "patch",
+
+				effective_date: patch.effective_date ? moment(patch.effective_date) : null,
+				effective_date_display: patch.effective_date ? moment(patch.effective_date).format("MMMM D, YYYY") : "(Not Set)"
+			};
+		}
+
+		// Serialize the tree into a timeline by following each patch to its
+		// child with the longest depth, which is our best guess as to which
+		// path is the primary line of development of the code. Each entry
+		// in the timeline is an array of patches, the first of which is the
+		// root of a subtree.
+		var code_history = [];
+		var rec = root_rec;
+		var prev_rec_array = null;
+		while (rec) {
+			var rec_array = [];
+			rec_array.push(patch_for_template(rec.patch, rec.base_patch, 0));
+			code_history.push(rec_array);
+
+			// Check that consecutive patches have effective dates that
+			// are in chronological order. If not, set a flag so we can
+			// display a warning.
+			if (prev_rec_array && rec_array[0].effective_date && prev_rec_array[0].effective_date && prev_rec_array[0].effective_date.diff(rec_array[0].effective_date) > 0) {
+				rec_array[0].date_out_of_order = true;
+				prev_rec_array[0].date_out_of_order = true;
 			}
 
-			// then the patch itself
-			ret.push(rec);
+			prev_rec_array = rec_array;
 
-			// then any other child, which is shown as a sub-patch within the
-			// main patch 
-			children.forEach(function(item) {
-				serialize(item, ret, (indent||0)+1);
-			});
+			// Take the first child -- the one with the longest depth -- out of the
+			// children array and set it as 'next_rec' so that on the next iteration we
+			// place it into the timeline as a top-level entry. If there are no
+			// children, set next_rec to null to we are done.
+			var next_rec;
+			if (rec.children.length > 0) {
+				next_rec = rec.children.shift();
+			} else {
+				next_rec = null;
+			}
+
+			// Move any remaining decendants of this patch into rec_array.
+			function do_descendants(rec, depth) {
+				rec.children.forEach(function(child) {
+					rec_array.push(patch_for_template(child.patch, rec.patch, depth));
+					do_descendants(child, depth+1);
+				});
+			}
+			do_descendants(rec, 1);
+
+			rec = next_rec;
 		}
-		var code_history = [];
-		serialize(root_rec, code_history);
+
+		code_history.reverse();
 
 		callback(code_history);
 	});
