@@ -313,6 +313,21 @@ Patch.prototype.getBase = function(callback) {
 	Patch.loadByUUID(this.base, callback);
 }
 
+Patch.prototype.getAncestors = function(callback) {
+	/* Gets all of the base patches recursively. */
+	if (this.type == "root") {
+		// a root patch has no ancestors
+		callback([]);
+	} else {
+		this.getBase(function(base_patch) {
+			base_patch.getAncestors(function(ancestors) {
+				ancestors.push(base_patch); // modify in place
+				callback(ancestors);
+			})
+		});
+	}
+}
+
 Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
 	/* Get a list of files that exist after this patch is applied in
 	   the directory named path (or null for the root path). Only
@@ -781,8 +796,9 @@ Patch.prototype.getDiff = function(callback) {
 }
 
 Patch.prototype.get_jot_operations = function(callback) {
-	/* Computes an array of JOT operations object that represent the changes made by this patch. 
-	   Passes the array to the callback. */
+	/* Computes an array of JOT object APPLY operations that represent the changes
+	   made by this patch. Passes the array to the callback. Each APPLY operation
+	   encodes which path it is for. */
 
 	var jot_objects = require('../ext/jot/jot/objects.js');
 	var jot_sequences = require('../ext/jot/jot/sequences.js');
@@ -813,11 +829,8 @@ Patch.prototype.get_jot_operations = function(callback) {
 				);
 			});
 		},
-		function(err, result) {
-			var ret = [];
-			for (var i in result)
-				ret = ret.concat(result[i]);
-			callback(ret)
+		function(err, results) {
+			callback(results);
 		}
 	);	
 };
@@ -826,6 +839,9 @@ Patch.prototype.compute_rebase = function(jot_op, callback) {
 	// Computes the rebase of the *subtree* headed by this patch
 	// against jot_op, which is a JOT operation object representing
 	// the changes made in the patch we are rebasing against.
+	//
+	// If stop_at is a Patch, then we recurse only as deeply as
+	// as that patch.
 
 	var patch = this;
 	this.get_jot_operations(function(this_as_jot_op) {
@@ -896,7 +912,7 @@ Patch.prototype.save_rebase = function(rebase_data, callback) {
 
 			// now apply to the children
 			async.map(
-				rebase_data.children,
+				rebase_data.children || [],
 				function(child_info, callback) {
 					var child_uuid = child_info[0];
 					var child_rebase_data = child_info[1];
@@ -914,8 +930,8 @@ Patch.prototype.save_rebase = function(rebase_data, callback) {
 
 Patch.prototype.merge_up = function(callback) {
 	/* Merges a patch with its parent, rebasing any other children of the parent. 
-	   If this patch has children, the children's base is chnaged to be this
-	   patch's base. */
+	   If this patch has children, the children are moved to be the children of
+	   this patch's base. */
 
 	if (this.type == "root") {
 		callback("Cannot merge up a root patch.");
@@ -1003,4 +1019,208 @@ Patch.prototype.merge_up = function(callback) {
 		});
 	});
 
+}
+
+Patch.prototype.move_to = function(new_base, callback) {
+	/* Reorders the patches. We may be in one of two situations. First
+	   check who is a descendant of who. */
+
+	if (this.id == new_base.id) {
+		callback("Cannot move a patch to be a child of itself.")
+		return;
+	}
+
+	var patch = this;
+	async.map(
+		[patch, new_base],
+		function(item, callback) { item.getAncestors(function(ancestors) { callback(null, ancestors); }); },
+		function(err, results) {
+			// Who is in whose ancestor list.
+
+			// Is new_base an ancestor of patch?
+			for (var i = 0; i < results[0].length; i++) {
+				if (results[0][i].id == new_base.id) {
+					move_to_ancestor_position(patch, new_base, results[0].slice(i+1), callback);
+					return;
+				}
+			}
+
+			// Is patch an ancestor of new_base?
+			for (var i = 0; i < results[1].length; i++) {
+				if (results[1][i].id == patch.id) {
+					move_to_descendant_position(patch, new_base, results[1].slice(i+1), callback);
+					return;
+				}
+			}
+
+			callback("You cannot move that patch there.")
+		});
+}
+
+function move_to_ancestor_position(patch, new_base, route, callback) {
+	/* This patch is a descendant of new_base.
+
+	   Move around patches so that
+	     new_base C1 ... CN patch D1
+	   becomes
+	     new_base patch C1 ... CN D1
+
+	   Which means:
+	     * C1, new_base's child and an ancestor of patch, goes from being a child of new_base to being a child of patch
+	     * patch goes from being a child of CN to being a child of new_base
+	     * D1, patch's first child, becomes a child of CN (other children of patch are not affected and are carried along)
+
+	   We can think about this operation as iteratively reversing the
+	   order of patch and its base until we've flipped patch and C1.
+	*/
+
+	if (patch.base == new_base.uuid) {
+		callback("Nothing to do.");
+		return;
+	}
+
+	var iterstate = { index: route.length };
+
+    flip_and_iterate(
+    	patch,
+    	function() {
+    		iterstate.index--;
+    		if (iterstate.index < 0) return null; // no more
+    		return route[iterstate.index];
+    	},
+    	-1,
+    	function(err, patch_rebase_data, route_rebase_data) {
+    		if (err) {
+    			callback(err);
+    			return;
+    		}
+
+    		async.parallel({
+    			write_patch_rebase: function(cb) { patch.save_rebase({me: patch_rebase_data}, cb); },
+    			write_route_rebases: function(cb) {
+    				async.map(
+    					route_rebase_data,
+    					function(item, callback) { item[0].save_rebase({me: item[1]}, callback); },
+    					function(err, results) { cb(); }
+    				);
+    			},
+    			fix_connectivity: function(cb) {
+		    		if (patch.children.length == 0)
+		    			finish(null);
+		    		else
+		    			Patch.loadByUUID(patch.children[0], finish);
+
+		    		function finish(d1) {
+				     	// C1, new_base's child and an ancestor of patch, goes from being a child of new_base to being a child of patch
+				     	new_base.children = new_base.children.filter(function(uuid) { uuid != route[0].uuid });
+				     	route[0].base = patch.uuid;
+				     	patch.children.push(route[0].uuid);
+
+				     	// patch goes from being a child of CN to being a child of new_base
+				     	route[route.length-1].children = route[route.length-1].children.filter(function(uuid) { uuid != patch.uuid });
+				     	patch.base = new_base.uuid;
+				     	new_base.children.push(patch.uuid);
+				     	
+				     	// D1, patch's first child, becomes a child of CN (other children of patch are not affected and are carried along)
+				     	if (d1) {
+				     		patch.children = patch.children.filter(function(uuid) { uuid != d1.uuid });
+				     		d1.base = route[route.length-1].uuid;
+				     		route[route.length-1].children.push(d1.uuid);
+				     	}
+
+				     	// and save
+				     	new_base.save();
+				     	route[0].save()
+				     	route[route.length-1].save()
+				     	patch.save()
+
+				     	// done
+			    		cb();
+		    		}
+    			}
+    		},
+    		function() {
+    			callback(); // success
+    		});
+    	}
+    );
+}
+
+function move_to_descendant_position(patch, new_base, route, callback) {
+	/* This patch is an ancestor of new_base and patch (but not its descendants)
+	   becomes a child of new_base.
+
+	   Move around patches so that
+	     P patch C1 ... new_base D1
+	   becomes
+	     P C1 ... new_base patch D1
+
+	   Which means:
+	     * C1, patch's child and an ancestor of new_base, goes from being a child of patch to being a child of P
+	     * patch goes from being a child of P to being a child of new_base
+	     * D1, new_base's first child, becomes a child of patch (other children of new_base are not affected)
+
+	   We can think about this operation as iteratively reversing the
+	   order of patch and its base until we've flipped patch and C1.
+	   */
+
+	if (patch.type == "root") {
+		callback("A root patch cannot be moved.")
+		return;
+	}
+
+   callback("B " + route.map(function(item) { return item.id }));
+}
+
+function flip_patches_compute_rebase(a, b) {
+	/* Computes the rebase required to flip two patches, where a is the parent of b.
+	   The arguments a and b are arrays of JOT operations.
+
+	   We replace b's operations with b rebased against the inverse of a, and we
+	   replace a's operations with a rebased against *that* (= b rebased against
+	   the inverse of a).
+	*/
+
+	var jot_base = require('../ext/jot/jot/base.js');
+
+	var a_inv = jot_base.invert_array(a);
+	var b_new = jot_base.rebase_array(a_inv, b);
+	if (!b_new) return false;
+
+	var a_new = jot_base.rebase_array(b_new, a);
+	if (!a_new) return false;
+
+	return [a_new, b_new];
+}
+
+function flip_and_iterate(starting_patch, get_next_item_func, direction, callback) {
+	function iter(item1_ops, prev_item_rebase_data) {
+		var item2 = get_next_item_func();
+		if (!item2) {
+			callback(null, item1_ops, prev_item_rebase_data); // all done
+			return;
+		}
+
+		item2.get_jot_operations(function(item2_ops) {
+			var rebases;
+			if (direction == 1) { // moving item1 to the right
+				rebases = flip_patches_compute_rebase(item1_ops, item2_ops);
+			} else if (direction == -1) { // moving item1 to the left
+				rebases = flip_patches_compute_rebase(item2_ops, item1_ops);
+				rebases = [rebases[1], rebases[0]];
+			}
+
+			if (!rebases) {
+				// fail
+				callback("There is a conflict at " + item2.id + ".");
+			} else {
+				prev_item_rebase_data.push([item2, rebases[1]]); // because item2 is now moved and finished
+				iter(rebases[0], prev_item_rebase_data); // because item1 is carried forward to the next flip
+			}
+		});
+	}
+
+	starting_patch.get_jot_operations(function(item1_ops) {
+		iter(item1_ops, [])
+	});
 }

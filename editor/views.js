@@ -124,6 +124,25 @@ exports.set_routes = function(app) {
 				"status": "ok"
 			}));
 		}
+
+		if (req.body.action == "move") {
+			// Move a patch to be the child of another patch.
+			var new_base_patch = patches.Patch.load(req.body.new_base);
+			patch.move_to(new_base_patch, function(status) {
+				res.setHeader('Content-Type', 'application/json');
+				if (!status) {
+					// success
+					res.send(JSON.stringify({
+						"status": "ok"
+					}));
+				} else {
+					res.send(JSON.stringify({
+						"status": "error",
+						"msg": status
+					}));
+				}
+			});
+		}
 	});
 
 	function render_patch_notes(patch) {

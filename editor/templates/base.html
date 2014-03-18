@@ -10,6 +10,7 @@
 
         <title>{% block title %}Code Editor{% endblock %}</title>
 
+        <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
         <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
         <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
         <link rel="stylesheet" href="/static/bootstrap-datepicker.css">
@@ -59,6 +60,7 @@
 
         <script src="/static/jquery.js"></script>
         <script>$(document).ajaxSend(function(event, xhr, settings) { if (!/^https?:.*/.test(settings.url)) xhr.setRequestHeader("X-CSRFToken", "{{csrf_token}}"); });</script>
+        <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
 
         <script src="/static/bootstrap/js/bootstrap.min.js"></script>
         <script src="/static/bootstrap-datepicker.js"></script>

@@ -31,6 +31,11 @@
 						{% if not patch.modify_with_new_patch and patch.indent > 0 %}
 							<div><a href="{{patch.edit_url}}/_new">New Patch</a></div>
 						{% endif %}
+						{% if patch.type == 'patch' && patch.indent == 0 %}
+						<div class="drag-handle" style="cursor: move">
+							DRAG
+						</div>
+						{% endif %}
 					</div>
 				</div>
 			</div>
@@ -45,6 +50,58 @@
 
 {% block scripts %}
 <script>
+$(function() {
+   $('#timeline-patches').sortable({
+        // Only make the .panel-heading child elements support dragging.
+        // Omit this to make then entire <li>...</li> draggable.
+        axis: 'y',
+        handle: '.drag-handle',
+        cursor: "move",
+        stop: function( event, ui ) {
+        	var patch_id = ui.item.attr("data-patch-id");
+        	var place_after_id = ui.item.next().attr("data-patch-id");
+        	var place_before_id = ui.item.prev().attr("data-patch-id");
+
+        	if (!place_after_id) {
+        		// before the first patch
+        		show_modal_error("Move", "You cannot drag a patch here.");
+        		$("#timeline-patches").sortable("cancel");
+        		return;
+        	}
+
+			show_modal_confirm(
+				"Move Patch",
+				"Are you sure you want to move " + patch_id + " to follow " + place_after_id
+				+ (place_before_id ? " (and precede " + place_before_id + ")" : "")
+				+ "?",
+				"Move",
+				function() {
+					// user says go for it
+					ajax_call(
+						"/patch/" + patch_id + "/_action",
+						{
+							action: "move",
+							new_base: place_after_id
+						},
+						function(res) {
+							// it worked, so keep the sort order
+						},
+						"Move",
+
+						 // error of some sort, attempt to put things back. seems like we can still
+						 // call cancel asynchronously with the event that generated the sort
+						 // stop event in the first place.
+						function() { $("#timeline-patches").sortable("cancel"); }
+					);
+				},
+				function() {
+					// user says cancel
+		        	$("#timeline-patches").sortable("cancel");
+				});
+        }
+    });
+});
+
 function do_merge_up(elem) {
 	show_modal_confirm(
 		"Merge Patches",
