@@ -35,6 +35,10 @@
         {% block body %}
         {% endblock %}
 
+        <div id="ajax_loading_indicator" style="display: none; position: absolute; left: 0; top: 0; width: 100%; height: 100%; text-align: center; text-align: center; background-color: rgba(255,255,255,.75)">
+          <img src="/static/loading.gif" id="loading-indicator" style="margin-top: 25%" />
+        </div>
+
         <div id="global_modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="errorModalTitle" aria-hidden="true">
           <div class="modal-dialog modal-sm">
             <div class="modal-content">
