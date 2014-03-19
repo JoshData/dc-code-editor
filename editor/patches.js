@@ -265,6 +265,7 @@ Patch.load = function(patch_id) {
 	patch.id = patch_id;
 	patch.edit_url = "/patch/" + patch_id;
 	if (patch.type != "root" && patch.children == 0) patch.can_modify = true;
+	patch.export_hashes = patch.export_hashes || [];
 
 	// parse some fields
 	patch.created = new Date(patch.created);
@@ -337,6 +338,14 @@ Patch.prototype.getAncestors = function(callback) {
 			})
 		});
 	}
+}
+
+Patch.prototype.getAncestorsAndMe = function(callback) {
+	var patch = this;
+	this.getAncestors(function(ancestors) {
+		ancestors.push(patch);
+		callback(ancestors);
+	})
 }
 
 Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
@@ -806,3 +815,111 @@ Patch.prototype.getDiff = function(callback) {
 		}
 	);
 }
+
+Patch.prototype.export_code = function(callback) {
+	// This patch is the last commit to export. Creates a git commit
+	// for each patch. Calls callback(err, array_of_git_outputs).
+
+	// Get the history of this patch. We'll turn each patch in the history
+	// into a commit in the local code repository.
+	this.getAncestorsAndMe(function(patch_history) {
+		if (patch_history[0].type != "root") {
+			callback("Invalid initial patch.");
+			return;
+		}
+
+		// remove the root patch from the history since we never commit it
+		var root_patch = patch_history.shift();
+
+		// see where the repository is
+		repo.get_repository_head(function(head_hash) {
+			// If we've already exported the code, then a range of patches
+			// starting with the root may already have export_hashes filled
+			// in. But those patches may have changed! Like if there's a
+			// technical correction. So we will in that case have to write
+			// a commit for any corrections.
+
+			// Pop off any ancestors (most ancient first) that have already
+			// been committed, but remember the last one.
+			var last_commited_patch = null;
+			var all_changed_paths = { };
+			while (patch_history.length > 0 && patch_history[0].export_hashes.length > 0) {
+				last_commited_patch = patch_history.shift();
+				Object.keys(last_commited_patch.files).forEach(function(item) { all_changed_paths[item] = true });
+			}
+
+			if ((last_commited_patch == null && root_patch.hash != head_hash)
+				|| (last_commited_patch != null && last_commited_patch.export_hashes.indexOf(head_hash) == -1)) {
+				callback("The repository is positioned on a commit that does not correspond to a patch we know about.");
+				return;
+			}
+			if (patch_history.length == 0 && last_commited_patch == null) {
+				callback("There is nothing to export.");
+				return;
+			}
+
+			// start committing!
+			async.mapSeries(
+				[-1].concat(patch_history),
+				function(item, callback) {
+					if (item == -1) {
+						// Loop through all of its changed paths between the root and
+						// the last committed revision (inclusive), and write any
+						// changed paths as a correction commit.
+						last_commited_patch.commit(
+							Object.keys(all_changed_paths),
+							"corrections",
+							callback);
+
+					} else {
+						item.commit(null, null, callback)
+					}
+				},
+				callback
+			)
+		});
+
+	});
+}
+
+Patch.prototype.commit = function(changed_paths, message, callback) {
+	// Reset the working tree (reset --hard), adds any modified
+	// or deleted files (add -A), commits the result (commit -m),
+	// and calls callback with (err, hash, commit_output).
+	var patch = this;
+	repo.clean_working_tree(function() {
+		// make the modifications specified by this patch in the working tree of the repository
+		async.map(
+			changed_paths || Object.keys(patch.files),
+			function(changed_path, callback) {
+				patch.getPathContent(changed_path, false, function(base_content, current_content) {
+					if (current_content != "")
+						repo.write_working_tree_path(changed_path, current_content, callback);
+					else
+						repo.delete_working_tree_path(changed_path, callback);
+				});
+			},
+			function(err, results) {
+				if (err) { callback(err); return; }
+				repo.commit(
+					message || patch.id + "\n\n" + patch.notes,
+					"authorname",
+					"test@example.org",
+					function(commit_output) {
+						repo.get_repository_head(function(commit_hash) {
+							// since the commit might be silently skipped if there are
+							// no changes in this patch, we may see the hash multiple times,
+							// but only add it once.
+							if (patch.export_hashes.indexOf(commit_hash) == -1)
+								patch.export_hashes.push(commit_hash);
+							patch.save();
+
+							callback(null, [commit_hash, commit_output]);
+						})
+					});
+			}
+		);
+
+	});
+}
+

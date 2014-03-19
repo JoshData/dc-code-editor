@@ -4,6 +4,10 @@
 
 {% block body %}
 <div class="container">
+	<div style="float: right; text-align: right">
+		<a href="#" onclick="return do_export_code()" class="btn btn-warning">Export the Code</a>
+	</div>
+
 	<h1>Timeline</h1>
 
 	<div id="timeline">
@@ -29,9 +33,6 @@
 					<div class="timeline-patch-metadata">
 						{% if patch.type == "patch" %}
 							<div><em>Effective Date:</em> <span {% if patch.date_out_of_order %}style="color: red"title="Date Is Out Of Order"{% endif %}>{{patch.effective_date_display}}</span></div>
-						{% endif %}
-						{% if patch.can_merge_up and patch.indent > 0 %}
-							<div><a href="{{patch.edit_url}}/_merge_up" onclick="return do_merge_up(this);" data-title="{{patch.id}}" data-base_title="{{patch.base_id}}">Merge with {{patch.base_id}}</a></div>
 						{% endif %}
 					</div>
 				</div>
@@ -98,6 +99,28 @@ $(function() {
         }
     });
 });
+
+function do_export_code() {
+	show_modal_confirm(
+		"Export Code",
+		"Are you ready to export the code? Each patch will be turned into a commit in your local code repository.",
+		"Export",
+		function() {
+			// user says go for it
+			ajax_call(
+				"/_export_code",
+				{
+					head: "{{head_patch.id}}"
+				},
+				function(res) {
+					show_modal_error("Export Code", "The export is complete.");
+					console.log(res.git_output);
+				},
+				"Export Code"
+			);
+		});
+	return false;
+}
 
 </script>
 {% endblock %}

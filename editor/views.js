@@ -15,7 +15,7 @@ exports.set_routes = function(app) {
 		patches.getTree(function(patch_tree) {
 			res.send(home_template({
 				patch_tree: patch_tree,
-				head_patch: patch_tree[0]
+				head_patch: patch_tree[0][0]
 			}));
 		});
 	});
@@ -338,6 +338,18 @@ exports.set_routes = function(app) {
 		});
 	});
 
+	// Export The Code!
+	app.post('/_export_code', function(req, res){
+		var patch = patches.Patch.load(req.body.head);
+		patch.export_code(function(err, results) {
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify({
+				"status": (!err ? "ok" : "error"),
+				"msg": ""+err,
+				"git_output": results ? results.join("\n") : null
+			}));
+		});
+	});
 }
 
 function finish_preview(fn, dom, other_resources, res) {
