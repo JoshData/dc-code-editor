@@ -14,9 +14,13 @@
 	<div class="row" style="padding: 1.5em 0;">
 		<div class="col-sm-3">
 			<label for="patchEffectiveDate">Effective Date:</label>
+			{% if patch.type == "patch" %}
 		  	<div class="input-group date" style="width: 12em">
 		  		<input id="patchEffectiveDate" type="text" class="form-control" readonly="1"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
 		  	</div>
+		  	{% else %}
+		  	<br><em>Not Applicable</em>
+		  	{% endif %}
 	  	</div>
 	  	<div class="col-sm-9">
 		    <label for="notesTextarea">Patch Description:</label>

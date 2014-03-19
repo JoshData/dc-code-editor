@@ -21,7 +21,9 @@
 				<div class="timeline-patch {% if patch.type == "root" %}root{% endif %}" style="margin-left: {{patch.indent * 2}}em">
 					<div class="timeline-patch-anchor"><a href="{{patch.edit_url}}">{{patch.id}}</a></div>
 					<div class="timeline-patch-metadata">
-						<div><em>Effective Date:</em> <span {% if patch.date_out_of_order %}style="color: red"title="Date Is Out Of Order"{% endif %}>{{patch.effective_date_display}}</span></div>
+						{% if patch.type == "patch" %}
+							<div><em>Effective Date:</em> <span {% if patch.date_out_of_order %}style="color: red"title="Date Is Out Of Order"{% endif %}>{{patch.effective_date_display}}</span></div>
+						{% endif %}
 						{% if patch.modify_with_new_patch %}
 							<div><a href="{{patch.edit_url}}/_new">Revise Patch</a></div>
 						{% endif %}
