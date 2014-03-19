@@ -792,21 +792,17 @@ Patch.prototype.getDiff = function(callback) {
 	// Computes a list of objects that have 'path' and 'diff'
 	// attributes representing the changes made by this patch.
 	var patch = this;
-	async.parallel(
-		// map the changed paths to functions that compute
-		// the unified diff on the changed path
-		Object.keys(patch.files).map(function(changed_path) {
-			return function(callback2) {
-				patch.getPathContent(changed_path, true, function(base_content, current_content) {
-					var diff = jsdiff.diffWords(base_content, current_content);
-					diff = simplify_diff(diff);
-					callback2(null, { path: changed_path, diff: diff }) // null=no error
-				});
-			};
-		}),
-
+	async.map(
+		Object.keys(patch.files),
+		function(changed_path, callback) {
+			patch.getPathContent(changed_path, true, function(base_content, current_content) {
+				var diff = jsdiff.diffWords(base_content, current_content);
+				diff = simplify_diff(diff);
+				callback(null, { path: changed_path, diff: diff }) // null=no error
+			});
+		},
 		function(err, results) {
 			callback(results);
 		}
-	);	
+	);
 }
