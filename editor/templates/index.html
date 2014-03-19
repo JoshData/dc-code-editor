@@ -99,20 +99,5 @@ $(function() {
     });
 });
 
-function do_merge_up(elem) {
-	show_modal_confirm(
-		"Merge Patches",
-		"Are you sure you want to merge " + elem.getAttribute("data-title") + " into " + elem.getAttribute("data-base_title") + "? Afterwards you will be left with a single patch named " + elem.getAttribute("data-base_title") + ".",
-		"Merge",
-		function() {
-			ajax_call(
-				elem.getAttribute('href'),
-				{ },
-				function(res) { window.location.reload(); },
-				"Merge Patch with Parent");
-		})
-	return false;
-}
-
 </script>
 {% endblock %}

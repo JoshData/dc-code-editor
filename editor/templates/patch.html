@@ -5,9 +5,11 @@
 {% block body %}
 <div class="container">
 	<p id="patch_actions" style="font-size: 80%; color: #444; margin: 0;">
-		<span>rename</span>
+		<span id="patch_rename">rename</span>
 		|
-		<span>delete</span>
+		<span id="patch_delete">delete</span>
+		|
+		<span id="patch_merge_up">merge into {{base_patch.id}}</span>
 	</p>
 	<h1 style="margin-top: 0">{{patch.id}}</h1>
 
@@ -120,7 +122,10 @@
 	$(function() {
 
 		$('#patch_actions span').css({cursor: "pointer"}).click(function() {
-			patch_action($(this).text());
+			if (this.getAttribute("id") == "patch_merge_up")
+				do_merge_up();
+			else
+				patch_action(this.getAttribute("id").substring(6)); // chop "patch_"
 		});
 
 		$('.input-group.date').datepicker({
@@ -196,6 +201,21 @@
 				$('#notes').html(res.markdown);
 			},
 			"Update Description");
+		return false;
+	}
+
+	function do_merge_up(elem) {
+		show_modal_confirm(
+			"Merge Patches",
+			"Are you sure you want to merge {{patch.id}} into {{base_patch.id}}? Afterwards you will be left with a single patch named {{base_patch.id}}.",
+			"Merge",
+			function(res) {
+				ajax_call(
+					"{{patch.edit_url}}/_merge_up",
+					{ },
+					function(res) { window.location = res.redirect; },
+					"Merge Patches");
+			})
 		return false;
 	}
 </script>

@@ -29,6 +29,12 @@ exports.set_routes = function(app) {
 
 		async.parallel(
 		{
+			// get the base patch
+			base: function(callback) {
+				if (patch.type == "root") { callback(null, null); return; }
+				patch.getBase(function(base_patch) { callback(null, base_patch); });
+			},
+
 			// get the list of editable files
 			file_list: function(callback) {
 				patch.getPaths(
@@ -55,6 +61,7 @@ exports.set_routes = function(app) {
 				files: result.file_list,
 				path: req.query.path,
 				path_up: path_up,
+				base_patch: result.base,
 				diffs: result.diffs
 			}));
 		});
@@ -131,7 +138,8 @@ exports.set_routes = function(app) {
 		if (req.body.action == "move") {
 			// Move a patch to be the child of another patch.
 			var new_base_patch = patches.Patch.load(req.body.new_base);
-			patch.move_to(new_base_patch, function(status) {
+			var mgmt = require("./management.js");
+			mgmt.move_to(patch, new_base_patch, function(status) {
 				res.setHeader('Content-Type', 'application/json');
 				if (!status) {
 					// success
@@ -319,11 +327,13 @@ exports.set_routes = function(app) {
 	// Merge a Patch with its Parent
 	app.post('/patch/:patch/_merge_up', function(req, res){
 		var patch = patches.Patch.load(req.params.patch);
-		patch.merge_up(function(err) {
+		var mgmt = require("./management.js");
+		mgmt.merge_up(patch, function(err, base_patch) {
 			res.setHeader('Content-Type', 'application/json');
 			res.send(JSON.stringify({
 				"status": (!err ? "ok" : "error"),
-				"msg": ""+err
+				"msg": ""+err,
+				"redirect": base_patch.edit_url
 			}));
 		});
 	});
