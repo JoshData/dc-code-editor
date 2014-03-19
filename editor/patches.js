@@ -689,9 +689,12 @@ Patch.prototype.delete = function(callback, force) {
 						return;
 					}
 					patch.getBase(function(base_patch) {
-						base_patch.children =
-							base_patch.children.filter(function(child_uuid) { return child_uuid != patch.uuid })
-							.concat(patch.children);
+						// remove this patch from the base patch's list of children
+						base_patch.children.splice(base_patch.children.indexOf(patch.uuid), 1);
+
+						// and this patch's children to the base patch's child list
+						base_patch.children = base_patch.children.concat(patch.children);
+
 						base_patch.save();
 						callback();
 					});
@@ -835,7 +838,8 @@ Patch.prototype.get_jot_operations = function(callback) {
 								jot_values.REP(
 									base_content,
 									current_content
-									)
+									),
+								"words"
 							)
 						)
 					)
@@ -1053,7 +1057,7 @@ Patch.prototype.move_to = function(new_base, callback) {
 			// Is new_base an ancestor of patch?
 			for (var i = 0; i < results[0].length; i++) {
 				if (results[0][i].id == new_base.id) {
-					move_to_ancestor_position(patch, new_base, results[0].slice(i+1), callback);
+					move_to_(-1, patch, new_base, results[0].slice(i+1), callback);
 					return;
 				}
 			}
@@ -1061,7 +1065,7 @@ Patch.prototype.move_to = function(new_base, callback) {
 			// Is patch an ancestor of new_base?
 			for (var i = 0; i < results[1].length; i++) {
 				if (results[1][i].id == patch.id) {
-					move_to_descendant_position(patch, new_base, results[1].slice(i+1), callback);
+					move_to_(1, patch, new_base, results[1].slice(i+1), callback);
 					return;
 				}
 			}
@@ -1070,8 +1074,10 @@ Patch.prototype.move_to = function(new_base, callback) {
 		});
 }
 
-function move_to_ancestor_position(patch, new_base, route, callback) {
-	/* This patch is a descendant of new_base.
+function move_to_(direction, patch, new_base, route, callback) {
+	/* Reorders patches. We may be in one of two cases.
+
+	A) direction == -1. The patch is a descendant of new_base.
 
 	   Move around patches so that
 	     new_base C1 ... CN patch D1
@@ -1083,78 +1089,110 @@ function move_to_ancestor_position(patch, new_base, route, callback) {
 	     * patch goes from being a child of CN to being a child of new_base
 	     * D1, patch's first child, becomes a child of CN (other children of patch are not affected and are carried along)
 
-	   We can think about this operation as iteratively reversing the
-	   order of patch and its base until we've flipped patch and C1.
+	B) direction == +1. The patch is an ancestor of new_base.
+
+	   Move around patches so that
+	     P patch C1 ... new_base D1
+	   becomes
+	     P C1 ... new_base patch D1
+
+	   But C1 may not be present. If C1 is present, this means:
+	     * C1, patch's child and an ancestor of new_base, goes from being a child of patch to being a child of P
+	     * patch goes from being a child of P to being a child of new_base
+	     * D1, new_base's first child, becomes a child of patch (other children of new_base are not affected)
+
+	   If C1 is not present,
+	     * new_base, which is patch's child, becomes a child of P
+	     * patch goes from being a child of P to being a child of new_base
+	     * D1, new_base's first child, becomes a child of patch (other children of new_base are not affected)
+
+	We can think about this operation as iteratively reversing the
+	order of patch and either its base or first child until we've
+	flipped patch and C1 or new_base.
 	*/
 
-	if (patch.base == new_base.uuid) {
+	if (direction == -1 && patch.base == new_base.uuid) {
 		callback("Nothing to do.");
 		return;
 	}
 
-	var iterstate = { index: route.length };
+	if (direction == 1 && patch.type == "root") {
+		callback("A root patch cannot be moved.")
+		return;
+	}
+
+	var root_copy = route.concat([]);
+	if (direction == 1) {
+		root_copy.push(new_base);
+		root_copy.reverse();
+	}
 
     flip_and_iterate(
     	patch,
     	function() {
-    		iterstate.index--;
-    		if (iterstate.index < 0) return null; // no more
-    		return route[iterstate.index];
+    		if (root_copy.length == 0)
+    			return null; // no more
+    		else
+    			return root_copy.pop();
     	},
-    	-1,
-    	function(err, patch_rebase_data, route_rebase_data) {
+    	direction,
+    	function(err, rebase_data) {
     		if (err) {
     			callback(err);
     			return;
     		}
 
-    		async.parallel({
-    			write_patch_rebase: function(cb) { patch.save_rebase({me: patch_rebase_data}, cb); },
-    			write_route_rebases: function(cb) {
-    				async.map(
-    					route_rebase_data,
-    					function(item, callback) { item[0].save_rebase({me: item[1]}, callback); },
-    					function(err, results) { cb(); }
-    				);
-    			},
-    			fix_connectivity: function(cb) {
-		    		if (patch.children.length == 0)
-		    			finish(null);
-		    		else
-		    			Patch.loadByUUID(patch.children[0], finish);
+    		// Re-jigger the connectivity. This must be done before writing
+    		// the rebased patch contents because that will have to look at
+    		// the connectivity to compute the new states of the paths.
 
-		    		function finish(d1) {
-				     	// C1, new_base's child and an ancestor of patch, goes from being a child of new_base to being a child of patch
-				     	new_base.children = new_base.children.filter(function(uuid) { uuid != route[0].uuid });
-				     	route[0].base = patch.uuid;
-				     	patch.children.push(route[0].uuid);
+    		var d1_parent = (direction == -1 ? patch : new_base);
+    		if (d1_parent.children.length == 0)
+    			save_connectivity(null);
+    		else
+    			Patch.loadByUUID(d1_parent.children[0], save_connectivity);
 
-				     	// patch goes from being a child of CN to being a child of new_base
-				     	route[route.length-1].children = route[route.length-1].children.filter(function(uuid) { uuid != patch.uuid });
-				     	patch.base = new_base.uuid;
-				     	new_base.children.push(patch.uuid);
-				     	
-				     	// D1, patch's first child, becomes a child of CN (other children of patch are not affected and are carried along)
-				     	if (d1) {
-				     		patch.children = patch.children.filter(function(uuid) { uuid != d1.uuid });
-				     		d1.base = route[route.length-1].uuid;
-				     		route[route.length-1].children.push(d1.uuid);
-				     	}
+    		function save_connectivity(d1, patch_base) {
+    			if (direction == -1) {
+			     	change_patch_parent(route[0], new_base, patch);
+			     	change_patch_parent(patch, route[route.length-1], new_base);
+			     	if (d1) change_patch_parent(d1, patch, route[route.length-1]);
+			    } else {
+			    	if (patch_base == null) {
+						patch.getBase(function(base_patch) { save_connectivity(d1, base_patch) });
+			    		return;
+			    	}
 
-				     	// and save
-				     	new_base.save();
-				     	route[0].save()
-				     	route[route.length-1].save()
-				     	patch.save()
+			    	console.log(route)
+			     	if (route.length > 0)
+			     		change_patch_parent(route[0], patch, patch_base);
+			     	else
+			     		change_patch_parent(new_base, patch, patch_base);
+			     	change_patch_parent(patch, patch_base, new_base);
+			     	if (d1) change_patch_parent(d1, new_base, patch);
+			    }
 
-				     	// done
-			    		cb();
-		    		}
-    			}
-    		},
-    		function() {
-    			callback(); // success
-    		});
+		     	// and save
+		     	new_base.save();
+		     	patch.save();
+		     	if (patch_base) patch_base.save()
+		     	if (d1) d1.save();
+		     	if (route.length > 0) route[0].save();
+		     	if (route.length > 0) route[route.length-1].save();
+
+		     	// Now save the rebased content changes. The changes must be saved
+		     	// in order because each patch looks at its parent's contents.
+		     	if (direction == -1) rebase_data.reverse();
+		     	function save_rebased_content() {
+		     		if (rebase_data.length == 0) {
+		     			callback(); // done
+		     		} else {
+		     			var next = rebase_data.shift();
+		     			next[0].save_rebase({me: next[1]}, save_rebased_content);
+		     		}
+		     	}
+		     	save_rebased_content();
+    		}
     	}
     );
 }
@@ -1163,24 +1201,11 @@ function move_to_descendant_position(patch, new_base, route, callback) {
 	/* This patch is an ancestor of new_base and patch (but not its descendants)
 	   becomes a child of new_base.
 
-	   Move around patches so that
-	     P patch C1 ... new_base D1
-	   becomes
-	     P C1 ... new_base patch D1
-
-	   Which means:
-	     * C1, patch's child and an ancestor of new_base, goes from being a child of patch to being a child of P
-	     * patch goes from being a child of P to being a child of new_base
-	     * D1, new_base's first child, becomes a child of patch (other children of new_base are not affected)
 
 	   We can think about this operation as iteratively reversing the
 	   order of patch and its base until we've flipped patch and C1.
 	   */
 
-	if (patch.type == "root") {
-		callback("A root patch cannot be moved.")
-		return;
-	}
 
    callback("B " + route.map(function(item) { return item.id }));
 }
@@ -1207,10 +1232,11 @@ function flip_patches_compute_rebase(a, b) {
 }
 
 function flip_and_iterate(starting_patch, get_next_item_func, direction, callback) {
-	function iter(item1_ops, prev_item_rebase_data) {
+	function iter(item1_ops, rebase_data) {
 		var item2 = get_next_item_func();
 		if (!item2) {
-			callback(null, item1_ops, prev_item_rebase_data); // all done
+			rebase_data.push([starting_patch, item1_ops]);
+			callback(null, rebase_data); // all done
 			return;
 		}
 
@@ -1220,15 +1246,15 @@ function flip_and_iterate(starting_patch, get_next_item_func, direction, callbac
 				rebases = flip_patches_compute_rebase(item1_ops, item2_ops);
 			} else if (direction == -1) { // moving item1 to the left
 				rebases = flip_patches_compute_rebase(item2_ops, item1_ops);
-				rebases = [rebases[1], rebases[0]];
+				if (rebases != null) rebases = [rebases[1], rebases[0]];
 			}
 
 			if (!rebases) {
 				// fail
-				callback("There is a conflict at " + item2.id + ".");
+				callback("The patch cannot be moved. There is a conflict with " + item2.id + ".");
 			} else {
-				prev_item_rebase_data.push([item2, rebases[1]]); // because item2 is now moved and finished
-				iter(rebases[0], prev_item_rebase_data); // because item1 is carried forward to the next flip
+				rebase_data.push([item2, rebases[1]]); // because item2 is now moved and finished
+				iter(rebases[0], rebase_data); // because item1 is carried forward to the next flip
 			}
 		});
 	}
@@ -1236,4 +1262,10 @@ function flip_and_iterate(starting_patch, get_next_item_func, direction, callbac
 	starting_patch.get_jot_operations(function(item1_ops) {
 		iter(item1_ops, [])
 	});
+}
+
+function change_patch_parent(patch, old_parent, new_parent) {
+	patch.base = new_parent.uuid;
+	old_parent.children.splice(old_parent.children.indexOf(patch.uuid), 1);
+	new_parent.children.push(patch.uuid);
 }

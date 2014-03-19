@@ -86,7 +86,11 @@ $(function() {
 							new_base: place_after_id
 						},
 						function(res) {
-							// it worked, so keep the sort order
+							// it worked, so keep the sort order...
+							// But we display links on patches to do things like merges, and
+							// what operations are now permissible has changed, so force a page reload.
+							$('#ajax_loading_indicator').show();
+							window.location.reload();
 						},
 						"Move",
 
