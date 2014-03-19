@@ -1109,6 +1109,10 @@ function move_to_(direction, patch, new_base, route, callback) {
 	We can think about this operation as iteratively reversing the
 	order of patch and either its base or first child until we've
 	flipped patch and C1 or new_base.
+
+	TODO: If there are intermediate children they need to be rebased too? And on patch
+	and new_base?
+
 	*/
 
 	if (direction == -1 && patch.base == new_base.uuid) {
