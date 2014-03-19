@@ -64,7 +64,10 @@ exports.set_routes = function(app) {
 	app.get('/patch/:patch/_new', function(req, res){
 		var patch = patches.Patch.load(req.params.patch);
 		patch = patch.createChild();
-		res.redirect(patch.edit_url);
+		if (!req.query.file)
+			res.redirect(patch.edit_url);
+		else
+			res.redirect(patch.edit_url + "/editor?file=" + req.query.file);
 	});
 
 	// Rename/Delete/Modify Patch
@@ -167,20 +170,35 @@ exports.set_routes = function(app) {
 		var filename = req.query.file;
 
 		var has_base_text = (patch.type != "root");
-		patch.getPathContent(filename, has_base_text, function(base_text, current_text) {
-			// make display nicer
-			if (has_base_text) base_text = spaces_to_tabs(base_text);
-			current_text = spaces_to_tabs(current_text);
 
-			res.send(edit_path_template({
-				patch: patch,
-				readonly: !has_base_text || (patch.children.length > 0),
-				filename: filename,
-				dirname: pathlib.dirname(filename),
-				base_text: JSON.stringify(base_text),
-				current_text: current_text
-			}));
-		})
+		async.parallel(
+			{
+				content: function(callback) {
+					patch.getPathContent(filename, has_base_text, function(base_text, current_text, base_patch) {
+						callback(null, { base_text: base_text, current_text: current_text, base_patch: base_patch } );
+					});
+				},
+				children: function(callback) {
+					patch.getChildren(function(children) { callback(null, children); });
+				}
+			},
+			function(err, resources) {
+				// make display nicer
+				if (has_base_text) resources.content.base_text = spaces_to_tabs(resources.content.base_text);
+				resources.content.current_text = spaces_to_tabs(resources.content.current_text);
+
+				res.send(edit_path_template({
+					patch: patch,
+					readonly: !has_base_text || (patch.children.length > 0),
+					filename: filename,
+					dirname: pathlib.dirname(filename),
+					base_patch: resources.content.base_patch,
+					child_patches: resources.children,
+					base_text: JSON.stringify(resources.content.base_text),
+					current_text: resources.content.current_text
+				}));
+			}
+		);
 	});
 
 	// Save a modified file in a patch.

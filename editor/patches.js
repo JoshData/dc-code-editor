@@ -313,6 +313,17 @@ Patch.prototype.getBase = function(callback) {
 	Patch.loadByUUID(this.base, callback);
 }
 
+Patch.prototype.getChildren = function(callback) {
+	/* Gets the child patches (asynchronously). */
+	async.map(
+		this.children,
+		function(item, callback) { Patch.loadByUUID(item, function(child) { callback(null, child); })  },
+		function(err, children) {
+			callback(children);
+		}
+	);
+}
+
 Patch.prototype.getAncestors = function(callback) {
 	/* Gets all of the base patches recursively. */
 	if (this.type == "root") {
@@ -490,17 +501,19 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 				if (path in patch.files) {
 					// This file is modified by the patch.
 					if (patch.files[path].method == "raw") {
-						fs.readFile(dirname + "/" + patch.files[path].storage, { encoding: "utf8" }, function(err, data) { if (err) throw err; callback(base_content, data); });
+						fs.readFile(dirname + "/" + patch.files[path].storage, { encoding: "utf8" },
+								function(err, data) { if (err) throw err; callback(base_content, data, base); }
+							);
 						return;
 					}
 					if (patch.files[path].method == "null") {
-						callback(base_content, "");
+						callback(base_content, "", base);
 						return;
 					}
 				}
 
 				// The file is not modified by this patch.
-				callback(base_content, base_content);
+				callback(base_content, base_content, base);
 			});
 		});
 	}
