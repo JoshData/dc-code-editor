@@ -610,17 +610,16 @@ Patch.prototype.rename = function(new_id, callback) {
 }
 
 Patch.prototype.delete = function(callback, force) {
-	/* Delete a patch, but only if the patch doesn't actually make any changes.
-
-	   If the patch has child patches, revise their base to be the base of this patch.
+	/* Delete a patch. Cannot be a patch that has children. If the patch
+	   has any path modifications, force must be set to true.
 	   */
 
 	var patch = this;
 
-	// A root patch can't be deleted if there are patches that referecne it because
-	// we can't re-assign their base patch to nothing.
-	if (this.children.length > 0 && this.type == "root") {
-		callback("A root patch cannot be deleted when there are patches applied after it.");
+	// A patch can't be deleted if there are patches that referecne it. A
+	// more complex operation would be needed to rebase child content.
+	if (this.children.length > 0) {
+		callback("A patch cannot be deleted when there are patches applied after it.");
 		return;
 	}
 
