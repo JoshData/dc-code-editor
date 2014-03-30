@@ -39,7 +39,15 @@
 
 /* Patch View */
 
+#diffs > .filename {
+	margin: 1em 0 0 0;
+	border: 1px solid #DDD;
+	background-color: #FFFAFA;
+	padding: 4px;
+	font-weight: bold;
+}
 #diffs > .diff {
+	margin-bottom: 1.5em;
 	white-space: pre-wrap;
 	font-size: 15px;
 	line-height: 19px;

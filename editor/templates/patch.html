@@ -8,8 +8,7 @@
 		<span id="patch_rename">rename</span>
 		|
 		<span id="patch_delete">delete</span>
-		|
-		<span id="patch_merge_up">merge into {{base_patch.id}}</span>
+		{% if base_patch and base_patch.type != "root" %} | <span id="patch_merge_up">merge into {{base_patch.id}}</span>{% endif %}
 	</p>
 	<h1 style="margin-top: 0">{{patch.id}}</h1>
 
@@ -21,7 +20,7 @@
 		  		<input id="patchEffectiveDate" type="text" class="form-control" readonly="1"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
 		  	</div>
 		  	{% else %}
-		  	<br><em>Not Applicable</em>
+		  	<br><em>Not applicable for a root patch.</em>
 		  	{% endif %}
 	  	</div>
 	  	<div class="col-sm-9">
@@ -46,10 +45,10 @@
 			<h2>Changed In This Patch</h2>
 
 			{% if diffs.length > 0 %}
-				<h3>File List</h3>
-				<ul style="list-style: none; padding: 0;">
+				<h3>Summary</h3>
+				<ul style="list-style: square; padding-left: 1.5em;">
 					{% for change in diffs %}
-						<a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a>
+						<li><a href="{{patch.edit_url}}/editor?file={{change.path}}">{{change.path}}</a></li>
 					{% endfor %}
 				</ul>
 
@@ -204,6 +203,7 @@
 		return false;
 	}
 
+	{% if base_patch %}
 	function do_merge_up(elem) {
 		show_modal_confirm(
 			"Merge Patches",
@@ -218,5 +218,6 @@
 			})
 		return false;
 	}
+	{% endif %}
 </script>
 {% endblock %}

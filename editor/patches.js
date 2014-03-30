@@ -652,7 +652,7 @@ Patch.prototype.delete = function(callback, force) {
 			// keeping just the strings which are the paths of modified files.
 			results = results.filter(function(item) { return item != null; });
 			if (results.length > 0) {
-				callback("This patch cannot be deleted while there are modifications in " + results.join(", ") + ".");
+				callback("This patch cannot be deleted while there are modifications in " + results.length + " file(s).");
 				return;
 			}
 
