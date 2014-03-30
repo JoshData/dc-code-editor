@@ -1,0 +1,47 @@
+{% if macros.length > 0 %}
+<p id="macros">
+	macros:
+	{% for i, macro in macros %}
+		{% if i != 0 %} | {% endif %}
+		<a href="#{{macro.id}}" onclick="return run_macro('{{macro.id}}');">{{macro.title}}</a>
+	{% endfor %}
+</p>
+
+<script>
+function run_macro(macro_id) {
+	// what we'll pass to the server...
+	var macro_args = {
+		macro: macro_id,
+		patch: "{{patch.id}}"
+	}
+
+	// get the HTML form associated with the macro
+	ajax_call(
+		"/_macro_get_form",
+		macro_args,
+		function(res) {
+			// display the form
+			var form = $("<form role='form' onsubmit='$(\"#global_modal .btn-danger\").click(); return false;'>" + res.html + "</form>");
+			show_modal_confirm(res.title, form, "OK",
+				function() {
+					// user clicked OK, so now execute the macro
+					var fields = form.serializeArray();
+					fields.forEach(function(obj) {
+						macro_args[obj.name] = obj.value;
+					});
+					ajax_call(
+						"/_macro_execute",
+						macro_args,
+						function(res2) {
+							if (res2.msg)
+								show_modal_error(res.title, res2.msg);
+							else
+								window.location.reload();
+						});
+				})
+		},
+		macro_id);
+	return false;
+}
+</script>
+{% endif %}

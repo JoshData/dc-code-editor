@@ -57,12 +57,17 @@ exports.set_routes = function(app) {
 			res.send(show_patch_template({
 				patch: patch,
 				readonly: (patch.type == "root") || (patch.children.length > 0),
+
 				notes: render_patch_notes(patch),
 				files: result.file_list,
+
 				path: req.query.path,
 				path_up: path_up,
 				base_patch: result.base,
-				diffs: result.diffs
+
+				diffs: result.diffs,
+
+				macros: get_macros("patch")
 			}));
 		});
 	});
@@ -357,6 +362,31 @@ exports.set_routes = function(app) {
 			}));
 		});
 	});
+
+	function get_macro_state(req) {
+		if ('patch' in req.body) req.body.patch = patches.Patch.load(req.body.patch);
+		var macro_module = require('./macros/' + req.body.macro + '.js');
+		return { "module": macro_module };
+	}
+
+	// Macros
+	app.post('/_macro_get_form', function(req, res) {
+		var macro = get_macro_state(req);
+		res.setHeader('Content-Type', 'application/json');
+		res.send(JSON.stringify({
+			"status": "ok",
+			"title": macro.module.title,
+			"html": macro.module.get_form(req.body)
+		}));
+	});
+	app.post('/_macro_execute', function(req, res) {
+		var macro = get_macro_state(req);
+		res.setHeader('Content-Type', 'application/json');
+		res.send(JSON.stringify({
+			"status": "ok",
+			"msg": macro.module.apply(req.body)
+		}));
+	});
 }
 
 function finish_preview(fn, dom, other_resources, res) {
@@ -376,4 +406,19 @@ function finish_preview(fn, dom, other_resources, res) {
 		"status": "ok",
 		"html": body.rendered
 	}));
+}
+
+
+function get_macros(macro_type) {
+	var glob = require("glob");
+	var path = require("path");
+
+	var macro_files = glob.sync("editor/macros/*.js");
+	var ret = [];
+	macro_files.forEach(function(item) {
+		var macro_module = require(item.replace(/^editor\//, './')); // require() is relative to this module
+		macro_module.id = path.basename(item).replace(/\.js$/, '');
+		if (macro_module.macro_type == macro_type) ret.push(macro_module);
+	});
+	return ret;
 }

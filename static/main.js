@@ -21,6 +21,7 @@ $(function() {
 
 function show_modal_error(title, message) {
 	$('#global_modal h4').text(title);
+	$('#global_modal .modal-body').html("<p/>");
 	$('#global_modal p').text(message);
 	$('#global_modal .btn-default').show().text("OK");
 	$('#global_modal .btn-danger').hide();
@@ -31,7 +32,12 @@ function show_modal_error(title, message) {
 
 function show_modal_confirm(title, question, verb, yes_callback, cancel_callback) {
 	$('#global_modal h4').text(title);
-	$('#global_modal p').text(question);
+	if (typeof question == String) {
+		$('#global_modal .modal-body').html("<p/>");
+		$('#global_modal p').text(question);
+	} else {
+		$('#global_modal .modal-body').html("").append(question);
+	}
 	$('#global_modal .btn-default').show().text("Cancel");
 	$('#global_modal .btn-danger').show().text(verb);
 	global_modal_funcs = [yes_callback, cancel_callback];
