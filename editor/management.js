@@ -24,11 +24,9 @@ Patch.prototype.get_jot_operations = function(callback) {
 						jot_meta.COMPOSITION(
 							// use Google Diff Match Patch to create an array of operations
 							// that represent the changes made to this path
-							jot_sequences.from_string_rep(
-								jot_values.REP(
-									base_content,
-									current_content
-									),
+							jot_sequences.from_diff(
+								base_content,
+								current_content,
 								"words"
 							)
 						)
