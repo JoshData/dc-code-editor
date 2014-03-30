@@ -132,8 +132,52 @@
 	  		prev_pos = through_pos;
 	  	}
 
-	  	// use Google Diff Match Patch to compare the old and new text
-	  	var diff = dmp.diff_main(base_text, editor.getValue(), true);
+
+		/////////////////////////////////////////////////////////////
+		// adapted from diff_match_patch.prototype.diff_linesToChars_
+		function diff_tokensToChars_(text1, text2, split_regex) {
+		  var lineArray = [];
+		  var lineHash = {};
+		  lineArray[0] = '';
+		  function munge(text) {
+		    var chars = '';
+		    var lineStart = 0;
+		    var lineEnd = -1;
+		    var lineArrayLength = lineArray.length;
+		    while (lineEnd < text.length - 1) {
+		      split_regex.lastIndex = lineStart;
+		      var m = split_regex.exec(text);
+		      if (m)
+		      	lineEnd = m.index;
+		      else
+		        lineEnd = text.length - 1;
+		      var line = text.substring(lineStart, lineEnd + 1);
+		      lineStart = lineEnd + 1;
+		      if (lineHash.hasOwnProperty ? lineHash.hasOwnProperty(line) :
+		          (lineHash[line] !== undefined)) {
+		        chars += String.fromCharCode(lineHash[line]);
+		      } else {
+		        chars += String.fromCharCode(lineArrayLength);
+		        lineHash[line] = lineArrayLength;
+		        lineArray[lineArrayLength++] = line;
+		      }
+		    }
+		    return chars;
+		  }
+
+		  var chars1 = munge(text1);
+		  var chars2 = munge(text2);
+		  return {chars1: chars1, chars2: chars2, lineArray: lineArray};
+		}
+		/////////////////////////////////////////////////////////////
+
+		// do a word-by-word diff
+		var current_text = editor.getValue();
+		var token_state = diff_tokensToChars_(base_text, current_text, /[\W]/g);
+		var diff = dmp.diff_main(token_state.chars1, token_state.chars2, true);
+		dmp.diff_charsToLines(diff, token_state.lineArray);
+		dmp.diff_cleanupSemantic(diff);
+
 	  	for (var i = 0; i < diff.length; i++) {
 	  		var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_modified" : "";
 	  		if (!diff[i][1].match(/\S/) || (i > 0 && i < diff.length-1 && diff[i][1].length < (diff[i-1][1].length+diff[i+1][1].length)/2)) {
