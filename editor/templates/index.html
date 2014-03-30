@@ -13,26 +13,28 @@
 	<div id="timeline">
 		<div class="uparrow"> </div>
 		<div class="timeline-row">
-			<div class="timeline-patch">
-				<a href="{{head_patch.edit_url}}/_new" style="font-style: italic">Start New Patch</a>
+			<div class="timeline-patch" style="padding-bottom: 30px">
+				<a href="{{head_patch.edit_url}}/_new"  class="btn btn-success">Start New Patch</a>
 			</div>
 		</div>
 		<div id="timeline-patches">
 		{% for patch_array in patch_tree %}
 		<div class="timeline-group" data-patch-id="{{patch_array[0].id}}">
-		{% for patch in patch_array %}
-			<div class="timeline-row">
-				<div class="timeline-patch {% if patch.type == "root" %}root{% endif %}" style="margin-left: {{patch.indent * 2}}em">
+		{% for i, patch in patch_array %}
+			<div class="timeline-row {% if patch.type == "root" %}root{% endif %} {% if i == 0 %}spine{% endif %}">
+				<div class="timeline-patch" style="margin-left: {{patch.indent * 2}}em">
 					<div>
 						{% if patch.type == 'patch' && patch.indent == 0 %}
-							<span class="drag-handle" style="cursor: move">☰</span>
+							<span class="drag-handle">☰</span>
+						{% else %}
+							<span class="fake-drag-handle">☰</span>
 						{% endif %}
 
 						<a href="{{patch.edit_url}}">{{patch.id}}</a>
 					</div>
 					<div class="timeline-patch-metadata">
 						{% if patch.type == "patch" %}
-							<div><em>Effective Date:</em> <span {% if patch.date_out_of_order %}style="color: red"title="Date Is Out Of Order"{% endif %}>{{patch.effective_date_display}}</span></div>
+							<div class="effective-date" data-effective-date="{{patch.effective_date_stamp}}"><em>Effective Date:</em> <span>{{patch.effective_date_display}}</span></div>
 						{% endif %}
 					</div>
 				</div>
@@ -48,7 +50,35 @@
 
 {% block scripts %}
 <script>
+var are_effective_dates_in_order = false;
+
+function update_effective_date_warnings() {
+	$('#timeline-patches .spine').removeClass("invalid-date");
+	are_effective_dates_in_order = true;
+
+	var prev_node = null;
+	$('#timeline-patches .spine').each(function(i, item) {
+		if (prev_node != null) {
+			function get_timestamp(node) {
+				var v = $(node).find('.effective-date').attr('data-effective-date');
+				if (v == 'null') return null;
+				return parseInt(v);
+			}
+			var d1 = get_timestamp(prev_node);
+			var d2 = get_timestamp(item);
+			if ((d1 && d2) && (d1 < d2)) {
+				$(prev_node).addClass("invalid-date");
+				$(item).addClass("invalid-date");
+				are_effective_dates_in_order = false;
+			}
+		}
+		prev_node = item;
+	});
+}
+
 $(function() {
+   update_effective_date_warnings();
+
    $('#timeline-patches').sortable({
         // Only make the .panel-heading child elements support dragging.
         // Omit this to make then entire <li>...</li> draggable.
@@ -83,6 +113,7 @@ $(function() {
 						},
 						function(res) {
 							// it worked, so keep the sort order...
+							update_effective_date_warnings()
 						},
 						"Move",
 

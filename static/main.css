@@ -14,6 +14,17 @@
 	#timeline .timeline-patch.root {
 		padding-bottom: 0;
 	}
+	#timeline .drag-handle {
+		cursor: move;
+		color: #77A;
+	}
+	#timeline .fake-drag-handle {
+		cursor: default;
+		color: #DDD;
+	}
+	#timeline .timeline-row.invalid-date {
+		color: red;
+	}
 #timeline .timeline-patch-metadata {
 	margin-left: 2em;
 	font-size: 90%;

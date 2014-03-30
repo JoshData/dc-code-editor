@@ -129,7 +129,7 @@ exports.getTree = function(callback) {
 				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
 				can_merge_up: base_patch != null && base_patch.type == "patch",
 
-				effective_date: patch.effective_date ? moment(patch.effective_date) : null,
+				effective_date_stamp: patch.effective_date ? moment(patch.effective_date).unix() : '0',
 				effective_date_display: patch.effective_date ? moment(patch.effective_date).format("MMMM D, YYYY") : "(Not Set)"
 			};
 		}
@@ -146,14 +146,6 @@ exports.getTree = function(callback) {
 			var rec_array = [];
 			rec_array.push(patch_for_template(rec.patch, rec.base_patch, 0));
 			code_history.push(rec_array);
-
-			// Check that consecutive patches have effective dates that
-			// are in chronological order. If not, set a flag so we can
-			// display a warning.
-			if (prev_rec_array && rec_array[0].effective_date && prev_rec_array[0].effective_date && prev_rec_array[0].effective_date.diff(rec_array[0].effective_date) > 0) {
-				rec_array[0].date_out_of_order = true;
-				prev_rec_array[0].date_out_of_order = true;
-			}
 
 			prev_rec_array = rec_array;
 
