@@ -354,7 +354,6 @@ function move_to_(direction, patch, new_base, route, callback) {
 			    		return;
 			    	}
 
-			    	console.log(route)
 			     	if (route.length > 0)
 			     		change_patch_parent(route[0], patch, patch_base);
 			     	else
@@ -424,7 +423,7 @@ function flip_and_iterate(starting_patch, get_next_item_func, direction, callbac
 				rebases = flip_patches_compute_rebase(item1_ops, item2_ops);
 			} else if (direction == -1) { // moving item1 to the left
 				rebases = flip_patches_compute_rebase(item2_ops, item1_ops);
-				if (rebases != null) rebases = [rebases[1], rebases[0]];
+				if (rebases) rebases = [rebases[1], rebases[0]];
 			}
 
 			if (!rebases) {
