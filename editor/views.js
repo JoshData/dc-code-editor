@@ -100,9 +100,16 @@ exports.set_routes = function(app) {
 		}
 
 		if (req.body.action == "delete") {
-			patch.delete(function(status) {
+			patch.delete(function(status, num_paths_modified) {
 				res.setHeader('Content-Type', 'application/json');
-				if (!status) {
+				if (num_paths_modified && !req.body.force) {
+					// did not delete, but deletion is possible with force
+					res.send(JSON.stringify({
+						"status": "ok",
+						"msg": "There are " + num_paths_modified + " files modified in this patch. Are you sure you want to delete it?",
+						"can_delete_with_force": true
+					}));
+				} else if (!status) {
 					res.send(JSON.stringify({
 						"status": "ok",
 						"redirect": "/"
@@ -113,7 +120,7 @@ exports.set_routes = function(app) {
 						"msg": status
 					}));
 				}
-			});
+			}, req.body.force);
 		}
 
 		if (req.body.action == "notes") {

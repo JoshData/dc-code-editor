@@ -166,7 +166,25 @@
   				action: action,
   				value: value
   			},
-  			function(res) { window.location = res.redirect; },
+  			function(res) {
+  				// force delete?
+  				if (res.can_delete_with_force) {
+					show_modal_confirm(
+						"delete",
+						res.msg,
+						"Delete",
+						function(res) {
+							ajax_call(
+								"{{patch.edit_url}}/_action",
+								{ action: 'delete', force: true },
+								function(res) { window.location = res.redirect; },
+								"delete");
+						})
+  					return;
+  				}
+
+  				window.location = res.redirect;
+  			},
   			action);
 	}
 
