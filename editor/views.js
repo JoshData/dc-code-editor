@@ -372,20 +372,36 @@ exports.set_routes = function(app) {
 	// Macros
 	app.post('/_macro_get_form', function(req, res) {
 		var macro = get_macro_state(req);
-		res.setHeader('Content-Type', 'application/json');
-		res.send(JSON.stringify({
-			"status": "ok",
-			"title": macro.module.title,
-			"html": macro.module.get_form(req.body)
-		}));
+		macro.module.get_form(req.body, function(html) {
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify({
+				"status": "ok",
+				"title": macro.module.title,
+				"html": html
+			}));
+		});
 	});
 	app.post('/_macro_execute', function(req, res) {
 		var macro = get_macro_state(req);
+
 		res.setHeader('Content-Type', 'application/json');
-		res.send(JSON.stringify({
-			"status": "ok",
-			"msg": macro.module.apply(req.body)
-		}));
+
+		var validation_error = macro.module.validate_form(req.body);
+		if (validation_error) {
+			res.send(JSON.stringify({
+				"status": "error",
+				"msg": validation_error
+			}));
+			return;
+		}
+
+		macro.module.apply(req.body, function(success, message) {
+			res.send(JSON.stringify({
+				"status": "ok",
+				"macro_success": success,
+				"msg": message
+			}));
+		})
 	});
 }
 

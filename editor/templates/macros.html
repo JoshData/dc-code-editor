@@ -8,6 +8,7 @@
 </p>
 
 <script>
+var last_macro_form_values = { };
 function run_macro(macro_id) {
 	// what we'll pass to the server...
 	var macro_args = {
@@ -22,19 +23,32 @@ function run_macro(macro_id) {
 		function(res) {
 			// display the form
 			var form = $("<form role='form' onsubmit='$(\"#global_modal .btn-danger\").click(); return false;'>" + res.html + "</form>");
+
+			// fill in fields with the last field the user entered
+			form.find('input, textarea, select').each(function() {
+				if (this.getAttribute('name') in last_macro_form_values)
+					$(this).val(last_macro_form_values[this.getAttribute('name')]);
+			});
+
 			show_modal_confirm(res.title, form, "OK",
 				function() {
 					// user clicked OK, so now execute the macro
 					var fields = form.serializeArray();
 					fields.forEach(function(obj) {
 						macro_args[obj.name] = obj.value;
+						last_macro_form_values[obj.name] = obj.value;
 					});
 					ajax_call(
 						"/_macro_execute",
 						macro_args,
 						function(res2) {
 							if (res2.msg)
-								show_modal_error(res.title, res2.msg);
+								show_modal_error(res.title, res2.msg, function() {
+									if (res2.macro_success)
+										window.location.reload();
+									else
+										run_macro(macro_id);
+								});
 							else
 								window.location.reload();
 						});

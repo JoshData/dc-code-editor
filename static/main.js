@@ -19,13 +19,14 @@ $(function() {
 	})	
 })
 
-function show_modal_error(title, message) {
+function show_modal_error(title, message, callback) {
+	$('#global_modal .modal-dialog').addClass("modal-sm");
 	$('#global_modal h4').text(title);
 	$('#global_modal .modal-body').html("<p/>");
 	$('#global_modal p').text(message);
 	$('#global_modal .btn-default').show().text("OK");
 	$('#global_modal .btn-danger').hide();
-	global_modal_funcs = null;
+	global_modal_funcs = [callback, callback];
 	global_modal_state = null;
 	$('#global_modal').modal({});
 }
@@ -33,9 +34,11 @@ function show_modal_error(title, message) {
 function show_modal_confirm(title, question, verb, yes_callback, cancel_callback) {
 	$('#global_modal h4').text(title);
 	if (typeof question == String) {
+		$('#global_modal .modal-dialog').addClass("modal-sm");
 		$('#global_modal .modal-body').html("<p/>");
 		$('#global_modal p').text(question);
 	} else {
+		$('#global_modal .modal-dialog').removeClass("modal-sm");
 		$('#global_modal .modal-body').html("").append(question);
 	}
 	$('#global_modal .btn-default').show().text("Cancel");
