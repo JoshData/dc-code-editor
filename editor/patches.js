@@ -340,23 +340,28 @@ Patch.prototype.getAncestorsAndMe = function(callback) {
 	})
 }
 
-Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
+Patch.prototype.getPaths = function(path, recursive, with_deleted_files, callback) {
 	/* Get a list of files that exist after this patch is applied in
 	   the directory named path (or null for the root path). Only
-	   immediate child paths are returned.
+	   immediate child paths are returned. Callback is called with
+	   a single argument that is an array of directory entries. Each
+	   entry is an object with properties type ('blob' or 'tree')
+	   and name.
 
 	   If with_deleted_files, then we include files deleted by this patch.
+
+	   path must not end in a slash.
 	   */
 
 	if (this.type == "root") {
 		// Go to the repository to get the files in the indicated path.
-		repo.ls(this.hash, path, callback);
+		repo.ls(this.hash, path, recursive, callback);
 	} else {
 		// Get the files in the base patch, never including files
 		// deleted in the base patch.
 		var patch = this;
 		this.getBase(function(base) {
-			base.getPaths(path, false, function(entries) {
+			base.getPaths(path, recursive, false, function(entries) {
 				// Turn the entries into an object keyed by filename.
 				var ret = { };
 				entries.forEach(function(item) { ret[item.name] = item });
@@ -364,19 +369,36 @@ Patch.prototype.getPaths = function(path, with_deleted_files, callback) {
 				// Modify according to any added and removed files in
 				// this patch.
 				for (var entry in patch.files) {
-					// Just look at entries that are immediate children of the requested path.
-					if (pathlib.dirname(entry) == path || (path == null && pathlib.dirname(entry) == '.')) {
-						var name = pathlib.basename(entry);
-						if (patch.files[entry].method == "null" && !with_deleted_files) {
-							// This path is deleted, and we're supposed to reflect that in the return value.
-							if (name in ret)
-								delete ret[name];
-						} else {
-							ret[name] = {
-								type: 'blob',
-								name: name
-							};
-						}
+					// If recurse is false, look at entries that are immediate children of the requested path.
+					// Otherwise, look at entries that are a descendant of the path.
+					var name = null;
+					if (!recursive) {
+						// if it's an immediate child of path, the returned name
+						// is the base name of the child path.
+						if (pathlib.dirname(entry) == path || (path == null && pathlib.dirname(entry) == '.'))
+							name = pathlib.basename(entry);
+					} else if (path == null) {
+						// no path and looking recursively, so the path to return is
+						// the raw entry path
+						name = entry;
+					} else {
+						// looking recursively at a subdirectory; is this a child path?
+						if ((pathlib.dirname(entry)+"/").substring(0, path.length+1) == path+"/")
+							name = entry.substring(path.length+1);
+					}
+
+					// If name wasn't set, this isn't an entry we are returning.
+					if (!name) continue;
+
+					if (patch.files[entry].method == "null" && !with_deleted_files) {
+						// This path is deleted, and we're supposed to reflect that in the return value.
+						if (name in ret)
+							delete ret[name];
+					} else {
+						ret[name] = {
+							type: 'blob',
+							name: name
+						};
 					}
 
 					// TODO: Or if there is a path (except deletions) that are in a subpath of
@@ -442,6 +464,7 @@ Patch.prototype.pathExists = function(path, with_deleted_files, callback) {
 	var fn = pathlib.basename(path);
 	this.getPaths(
 		up_path,
+		false, /* not recursive */
 		true, /* include files deleted in this patch, though we would have handled that case above */
 		function(entries) {
 			for (var i = 0; i < entries.length; i++) {

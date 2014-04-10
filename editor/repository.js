@@ -41,12 +41,21 @@ exports.get_repository_head = function(callback) {
 	});
 }
 
-exports.ls_hash = function(hash, recursive, callback) {
-	// Gets the directory listing corresponding to a hash, asynchronously. Calls callback
-	// with an array of directory entries, each an object with 'name', 'hash', 'type',
-	// and 'size' properties. Type is 'blob' (file) or 'tree' (directory). To move to
-	// a subdirectory, pass the hash associated with the subdirectory entry.
-	execute_git(["ls-tree", "-lz" + (recursive ? 'r' : ''), hash], null,
+exports.ls = function(hash, path, recursive, callback) {
+	// Gets the directory listing corresponding to a commit hash and a particular
+	// path (null for the root path), asynchronously.
+	//
+	// Calls callback with an array of directory entries, each an object with
+	// 'name', 'hash', 'type', and 'size' properties. Type is 'blob' (file) or
+	// 'tree' (directory).
+	//
+	// In the git call below, '-z' turns on null byte line endings, '-l' adds
+	// file sizes, and '-r' produces recursive output.
+
+	// To get the listings inside a directory, the path must end in a slash.
+	if (path && path[path.length-1] != '/') path += '/';
+
+	execute_git(["ls-tree", "-lz" + (recursive ? 'r' : ''), hash, (!path ? '' : path)], null,
 	function(output) {
 		var raw_entries = output.split("\0");
 		var entries = [];
@@ -55,6 +64,14 @@ exports.ls_hash = function(hash, recursive, callback) {
 			item = item.split("\t");
 			var filename = item[1];
 			item = item[0].split(" ");
+
+			// returned entries should be relative paths instead of
+			// absolute paths
+			if (path) {
+				if (filename.substring(0, path.length) != path) throw "Invalid path?";
+				filename = filename.substring(path.length);
+			}
+
 			entries.push({
 				type: item[1],
 				hash: item[2],
@@ -63,28 +80,6 @@ exports.ls_hash = function(hash, recursive, callback) {
 			})
 		});
 		callback(entries);
-	});
-}
-
-exports.ls = function(hash, path, callback) {
-	exports.ls_hash(hash, false, function(entries) {
-		if (!path) {
-			callback(entries);
-		} else {
-			var found = false;
-			var path_split = path.split("/");
-
-			entries.forEach(function(item) {
-				if (item.name == path_split[0]) {
-					found = true;
-					path = path_split.slice(1).join("/");
-					exports.ls(item.hash, path, callback);
-				}
-			});
-
-			// path not found
-			if (!found) callback(null);
-		}
 	});
 }
 

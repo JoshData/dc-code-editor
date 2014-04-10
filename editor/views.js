@@ -38,7 +38,7 @@ exports.set_routes = function(app) {
 			// get the list of editable files
 			file_list: function(callback) {
 				patch.getPaths(
-					req.query.path, true,
+					req.query.path, false /* not recursive */, true /* with deleted files */,
 					function(file_list) {
 						patches.sort_paths(file_list);
 						callback(null, file_list); // null=no error
