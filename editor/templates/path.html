@@ -106,7 +106,7 @@
   	}
 
 	  function on_change_delayed_250() {
-	  	update_diff();
+	  	editor.operation( function() { update_diff(); }); // holds editor rendering until the end
 	  	update_preview();
 	  }
 
@@ -116,6 +116,7 @@
 
 	  	// clear any markers we set last time around
 	  	for (var i = 0; i < current_diff_markers.length; i++) current_diff_markers[i].clear();
+        current_diff_markers = [];
 
 	  	// track our position, and a utility function using a closure to add a marker
 	  	var line_no = 0;
