@@ -70,6 +70,7 @@
 		lineNumbers: true,
 		indentWithTabs: true,
 		tabSize: 6,
+		smartIndent: false,
 		autoCloseTags: true
 	});
 	editor.setSize("100%", "100%");
@@ -106,8 +107,131 @@
 	}
 
 	function on_change_delayed_250() {
+		fix_indentation();
 		editor.operation( function() { update_diff(); }); // holds editor rendering until the end
 		update_preview();
+	}
+
+	function fix_indentation() {
+		/*
+		 * CodeEditor almost has a perfect way of doing this automatically,
+		 * but it only indents with spaces this way even if the editor is
+		 * configured to use tabs.
+		 *
+		 *	for (var i = editor.firstLine(); i <= editor.lastLine(); i++) {
+		 *		if (!/\S/.test( editor.getLine(i) )) continue; // don't touch lines with only whitespace
+		 *		editor.indentLine(i);
+		 *	}
+		 */
+
+		// Since we would lose the selection state when updating the text,
+		// don't do any fixing if something is selected.
+		if (editor.somethingSelected()) return;
+
+		var state = 'CONTENT';
+		var indent = 0;
+		var new_text = [];
+		var new_line = "";
+		var line_indent = 0;
+		var is_start_of_line = true;
+		var is_initial_tag = true;
+		var whitespace = { " ": true, "\t": true };
+		var current_text = editor.getValue();
+		for (var i = 0; i < current_text.length; i++) {
+			var c = current_text.charAt(i);
+
+			// skip any whitespace encountered at the start of a line
+			// as we've already inserted tab indentation
+			if (is_start_of_line && whitespace[c])
+				continue;
+			is_start_of_line = false;
+
+			// append the character we see to our line buffer
+			new_line += c;
+
+			// make a little state machine for detecting open, close, and self-closing tags
+			if (c == "<" && state == 'CONTENT') {
+				// the TAG state means we just began a tag
+				state = 'TAG';
+			} else if (c == ">" && (state == 'OPENTAG' || state == 'CLOSETAG' || state == 'SELFCLOSETAG')) {
+				// here we're closing a tag, but was it an open tag, a close tag,
+				// or a self-closing tag?
+				if (state == 'OPENTAG') {
+					indent++;
+				}
+				if (state == 'CLOSETAG') {
+					indent--;
+					if (is_initial_tag) {
+						// If this tag appears at the start of the line, then out-dent
+						// immediately. This is why this subroutine buffers lines.
+						line_indent = indent;
+					}
+				}
+				state = 'CONTENT';
+			} else if (c == "/" && state == 'TAG') {
+				// a '/' that's the first charater inside a tag indicates a close tag
+				state = 'CLOSETAG';
+			} else if (state == 'TAG') {
+				// any other character at the start of a tag indicates an open tag
+				state = 'OPENTAG';
+			} else if ((c == '"' || c == "'") && (state == 'OPENTAG' || state == 'CLOSETAG')) {
+				// begin a quoted attribute value
+				state = 'QUOTE-' + c + '-' + state;
+			} else if (state.substr(0, 6) == 'QUOTE-' && c == state.substr(6, 1)) {
+				// end a quoted attribute value
+				state = state.substr(8); // pop a silly stack
+				alert(state)
+			} else if (c == '/' && state == 'OPENTAG') {
+				// a slash inside an open tag and not within a quoted attribute probably
+				// signals this is a self-closing tag
+				state = 'SELFCLOSETAG';
+			} else if (state == 'CONTENT') {
+				// As soon as we see any content characters, turn off this flag.
+				is_initial_tag = false;
+			}
+
+			if (c == '\n') {
+				// Create for the line...
+				for (var j = 0; j < line_indent; j++)
+					new_text += "\t";
+
+				// Then append the line...
+				new_text += new_line;
+				new_line = '';
+
+				// And ignore any whitespace that immediately follows.
+				is_start_of_line = true;
+
+				// And be able to detect when a tag is the first thing on a line.
+				is_initial_tag = true;
+
+				// The indent for the next line will be the current indentation
+				// level we have now, unless we change it (see above)!
+				line_indent = indent;
+			}
+		}
+		new_text += new_line;
+
+		function get_initial_whitespace_count(line) {
+			for (var i = 0; i < line.length; i++)
+				if (!whitespace[line.charAt(i)])
+					return i;
+			return line.length;
+		}
+
+		if (current_text != new_text) {
+			// where was the cursor relative to the first non-white-space of the
+			// line!
+			var cursor = editor.getCursor();
+			cursor.ch -= get_initial_whitespace_count(editor.getLine(cursor.line));
+
+			editor.setValue(new_text);
+
+			// re-adjust the cursor position
+			cursor.ch += get_initial_whitespace_count(editor.getLine(cursor.line));
+
+			editor.setCursor(cursor);
+		}
 	}
 
 	var current_diff_markers = [];
