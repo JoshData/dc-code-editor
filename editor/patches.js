@@ -4,7 +4,6 @@ var pathlib = require("path");
 var clone = require('clone');
 var uuid = require('node-uuid');
 var async = require('async');
-var jsdiff = require('diff');
 
 var repo = require("./repository.js");
 var settings = require("./settings.js");
@@ -752,7 +751,7 @@ Patch.prototype.delete = function(callback, force) {
 
 }
 
-function simplify_diff(diff) {
+function diff_add_ellipses(diff) {
 	// Only include hunks that represent unchanged content
 	// that ocurr on the same line as changed content.
 	// Between lines, add an ellipsis.
@@ -819,8 +818,28 @@ Patch.prototype.getDiff = function(callback) {
 		Object.keys(patch.files),
 		function(changed_path, callback) {
 			patch.getPathContent(changed_path, true, function(base_content, current_content) {
-				var diff = jsdiff.diffWords(base_content, current_content);
-				diff = simplify_diff(diff);
+				var jot_seq = require("../ext/jot/jot/sequences");
+				var ops = jot_seq.from_diff(base_content, current_content, "words");
+
+				// turn the operations into a list of added/removed/unchanged hunks
+				var lastpos = 0;
+				var xpos = 0;
+				diff = [];
+				ops.forEach(function(op) {
+					if (op.pos+xpos != lastpos)
+						diff.push({ added: false, removed: false, value: base_content.substr(lastpos, op.pos+xpos-lastpos) })
+					lastpos = op.pos+xpos + op.old_value.length;
+					xpos -= (op.new_value.length - op.old_value.length);
+
+					if (op.old_value.length > 0)
+						diff.push({ added: false, removed: true, value: op.old_value })
+					if (op.new_value.length > 0)
+						diff.push({ added: true, removed: false, value: op.new_value })
+				});
+				if (lastpos != base_content.length-1)
+					diff.push({ added: false, removed: false, value: base_content.substr(lastpos, base_content.length-lastpos) })
+
+				diff = diff_add_ellipses(diff);
 				callback(null, { path: changed_path, diff: diff }) // null=no error
 			});
 		},
