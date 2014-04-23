@@ -306,12 +306,12 @@
 		dmp.diff_cleanupSemantic(diff);
 
 		for (var i = 0; i < diff.length; i++) {
-			var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_modified" : "";
+			var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_inserted" : "";
 			if (!diff[i][1].match(/\S/) || (i > 0 && i < diff.length-1 && diff[i][1].length < (diff[i-1][1].length+diff[i+1][1].length)/2)) {
 				// if a DIFF_EQUAL hunk is just whitespace or very short, display it as if it is
 				// a modification since it is probably a part of the same logical change as
 				// the hunks around it.
-				className = "editor_text_modified";
+				className = "editor_text_inserted";
 			}
 
 			if (diff[i][0] != DIFF_DELETE) {
