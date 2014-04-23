@@ -107,8 +107,10 @@
 	}
 
 	function on_change_delayed_250() {
-		fix_indentation();
-		editor.operation( function() { update_diff(); }); // holds editor rendering until the end
+		editor.operation( function() { 
+			fix_indentation();
+			update_diff();
+		}); // holds editor rendering until the end
 		update_preview();
 	}
 
