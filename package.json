@@ -21,7 +21,6 @@
     "clone": "0.1.11",
     "node-uuid": "~1.4.1",
     "async": "~0.2.10",
-    "diff": "~1.0.8",
     "markdown": "0.5.0",
     "moment": "2.5.1",
     "libxmljs": "https://github.com/JoshData/libxmljs/archive/jt.tar.gz",

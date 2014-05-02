@@ -56,15 +56,6 @@
 	background-color: #FAFAFA;
 	padding: 3px;
 }
-	#diffs > .diff > .added {
-		background-color: #FEE;
-		font-weight: bold;
-	}
-	#diffs > .diff > .removed {
-		background-color: #FEE;
-		color: #888;
-		text-decoration: line-through;
-	}
 
 /* Text Editor */
 
@@ -84,14 +75,17 @@
 		text-align: right;
 	}
 
-	.editor_text_modified {
-		background-color: #FEE;
-		font-weight: bold;
+	.editor_text_inserted, #diffs > .diff > .added {
+		/* can't use...
+		 *   bold: because it messes up indentation
+		 *   background color: because it interfers with text selection hilighting
+		 */
+		color: #F00;
+		text-decoration: underline;
 	}
 
-	.editor_text_deleted {
-		background-color: #FEE;
-		color: #888;
+	.editor_text_deleted, #diffs > .diff > .removed {
+		color: #F88;
 		text-decoration: line-through;
 	}
 

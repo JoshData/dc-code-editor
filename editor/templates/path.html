@@ -28,7 +28,7 @@
 	</div>
 	<h1 style="margin: 0">{{filename}}</h1>
 
-  	{% if readonly %}<p style="margin-top: 1em" class="text-warning">This patch is read-only.</p>{% endif %}
+	{% if readonly %}<p style="margin-top: 1em" class="text-warning">This patch is read-only.</p>{% endif %}
 
 	<div class="row">
 		<div class="col-sm-6">
@@ -58,79 +58,206 @@
 	<script src="/static/diff_match_patch.js"></script>
 
 	<script>
-	  var base_text = {{base_text|safe}};
-	  var dmp = new diff_match_patch();
-	  dmp.Diff_Timeout = .075; // otherwise the computation can be slow and interfere with the UI
+	var base_text = {{base_text|safe}};
+	var dmp = new diff_match_patch();
+	dmp.Diff_Timeout = .075; // otherwise the computation can be slow and interfere with the UI
 
-	  var editor = CodeMirror.fromTextArea($("#editor_textarea")[0], {
-	    mode: "text/xml",
-	    readOnly: {% if readonly %}true{% else %}false{% endif %},
-	    lineWrapping: true,
-	    autofocus: true,
-	    lineNumbers: true,
-	    indentWithTabs: true,
-	    tabSize: 6,
-	    autoCloseTags: true
-	  });
-	  editor.setSize("100%", "100%");
-	  editor.on('change', on_change);
-	  $(function() {
-	  	// things to do on initialization
-	  	if (base_text) update_diff(); // no base_text when viewing a root patch
-	  	update_preview()
-	  });
+	var editor = CodeMirror.fromTextArea($("#editor_textarea")[0], {
+		mode: "text/xml",
+		readOnly: {% if readonly %}true{% else %}false{% endif %},
+		lineWrapping: true,
+		autofocus: true,
+		lineNumbers: true,
+		indentWithTabs: true,
+		tabSize: 6,
+		smartIndent: false,
+		autoCloseTags: true
+	});
+	editor.setSize("100%", "100%");
+	editor.on('change', on_change);
+	$(function() {
+		// things to do on initialization
+		if (base_text) update_diff(); // no base_text when viewing a root patch
+		update_preview()
+	});
 
-	  // Utility code to fire a delayed event but if the event is fired
-	  // successively before the callback is executed, only execute the
-	  // callback once on the last-initiated delay.
-	  var delayed_event_flags = { };
-	  function fire_delayed_event(name, delay) {
-	  	if (!(name in delayed_event_flags)) delayed_event_flags[name] = 0;
-	  	delayed_event_flags[name]++;
-	  	var v = "delayed_event_flags['" + name + "']";
-	  	setTimeout(v + "--; if (" + v + " == 0) " + name + '()', delay);
-	  }
+	// Utility code to fire a delayed event but if the event is fired
+	// successively before the callback is executed, only execute the
+	// callback once on the last-initiated delay.
+	var delayed_event_flags = { };
+	function fire_delayed_event(name, delay) {
+		if (!(name in delayed_event_flags)) delayed_event_flags[name] = 0;
+		delayed_event_flags[name]++;
+		var v = "delayed_event_flags['" + name + "']";
+		setTimeout(v + "--; if (" + v + " == 0) " + name + '()', delay);
+	}
 
-	  var has_unsaved_changes = false;
-	  function on_change() {
-	  	$('#save_status').text("Not Saved").attr("class", "text-danger");
-	  	has_unsaved_changes = true;
+	var has_unsaved_changes = false;
+	function on_change() {
+		$('#save_status').text("Not Saved").attr("class", "text-danger");
+		has_unsaved_changes = true;
 
-	  	fire_delayed_event('on_change_delayed_250', 250);
-	  	fire_delayed_event('on_change_delayed_2000', 2000);
-	  }
+		fire_delayed_event('on_change_delayed_250', 250);
+		fire_delayed_event('on_change_delayed_2000', 2000);
+	}
 
-  	window.onbeforeunload = function() { 
-  	  if (has_unsaved_changes)
-  	    return "Hang on, I haven't saved your changes just yet.";
-  	}
+	window.onbeforeunload = function() { 
+		if (has_unsaved_changes)
+			return "Hang on, I haven't saved your changes just yet.";
+	}
 
-	  function on_change_delayed_250() {
-	  	update_diff();
-	  	update_preview();
-	  }
+	function on_change_delayed_250() {
+		editor.operation( function() { 
+			fix_indentation();
+			update_diff();
+		}); // holds editor rendering until the end
+		update_preview();
+	}
 
-	  var current_diff_markers = [];
-	  function update_diff() {
-	  	// Uses text marks in the code editor to show text that was modified or inserted.
+	function fix_indentation() {
+		/*
+		 * CodeEditor almost has a perfect way of doing this automatically,
+		 * but it only indents with spaces this way even if the editor is
+		 * configured to use tabs.
+		 *
+		 *	for (var i = editor.firstLine(); i <= editor.lastLine(); i++) {
+		 *		if (!/\S/.test( editor.getLine(i) )) continue; // don't touch lines with only whitespace
+		 *		editor.indentLine(i);
+		 *	}
+		 */
 
-	  	// clear any markers we set last time around
-	  	for (var i = 0; i < current_diff_markers.length; i++) current_diff_markers[i].clear();
+		// Since we would lose the selection state when updating the text,
+		// don't do any fixing if something is selected.
+		if (editor.somethingSelected()) return;
 
-	  	// track our position, and a utility function using a closure to add a marker
-	  	var line_no = 0;
-	  	var col_no = 0;
-	  	var prev_pos = {line: 0, ch: 0};
-	  	function mark_text(through_pos, className, is_deletion, replaced_text) {
-	  		var m;
-	  		if (!is_deletion) {
-		  		m = editor.markText(prev_pos, through_pos, { className: className })
-		  	} else {
-		  		m = editor.setBookmark(through_pos, { widget: $("<span class='editor_text_deleted'> </span>").text(replaced_text)[0] })
-		  	}
-	  		current_diff_markers.push(m);
-	  		prev_pos = through_pos;
-	  	}
+		var state = 'CONTENT';
+		var indent = 0;
+		var new_text = [];
+		var new_line = "";
+		var line_indent = 0;
+		var is_start_of_line = true;
+		var is_initial_tag = true;
+		var whitespace = { " ": true, "\t": true };
+		var current_text = editor.getValue();
+		for (var i = 0; i < current_text.length; i++) {
+			var c = current_text.charAt(i);
+
+			// skip any whitespace encountered at the start of a line
+			// as we've already inserted tab indentation
+			if (is_start_of_line && whitespace[c])
+				continue;
+			is_start_of_line = false;
+
+			// append the character we see to our line buffer
+			new_line += c;
+
+			// make a little state machine for detecting open, close, and self-closing tags
+			if (c == "<" && state == 'CONTENT') {
+				// the TAG state means we just began a tag
+				state = 'TAG';
+			} else if (c == ">" && (state == 'OPENTAG' || state == 'CLOSETAG' || state == 'SELFCLOSETAG')) {
+				// here we're closing a tag, but was it an open tag, a close tag,
+				// or a self-closing tag?
+				if (state == 'OPENTAG') {
+					indent++;
+				}
+				if (state == 'CLOSETAG') {
+					indent--;
+					if (is_initial_tag) {
+						// If this tag appears at the start of the line, then out-dent
+						// immediately. This is why this subroutine buffers lines.
+						line_indent = indent;
+					}
+				}
+				state = 'CONTENT';
+			} else if (c == "/" && state == 'TAG') {
+				// a '/' that's the first charater inside a tag indicates a close tag
+				state = 'CLOSETAG';
+			} else if (state == 'TAG') {
+				// any other character at the start of a tag indicates an open tag
+				state = 'OPENTAG';
+			} else if ((c == '"' || c == "'") && (state == 'OPENTAG' || state == 'CLOSETAG')) {
+				// begin a quoted attribute value
+				state = 'QUOTE-' + c + '-' + state;
+			} else if (state.substr(0, 6) == 'QUOTE-' && c == state.substr(6, 1)) {
+				// end a quoted attribute value
+				state = state.substr(8); // pop a silly stack
+				alert(state)
+			} else if (c == '/' && state == 'OPENTAG') {
+				// a slash inside an open tag and not within a quoted attribute probably
+				// signals this is a self-closing tag
+				state = 'SELFCLOSETAG';
+			} else if (state == 'CONTENT') {
+				// As soon as we see any content characters, turn off this flag.
+				is_initial_tag = false;
+			}
+
+			if (c == '\n') {
+				// Create for the line...
+				for (var j = 0; j < line_indent; j++)
+					new_text += "\t";
+
+				// Then append the line...
+				new_text += new_line;
+				new_line = '';
+
+				// And ignore any whitespace that immediately follows.
+				is_start_of_line = true;
+
+				// And be able to detect when a tag is the first thing on a line.
+				is_initial_tag = true;
+
+				// The indent for the next line will be the current indentation
+				// level we have now, unless we change it (see above)!
+				line_indent = indent;
+			}
+		}
+		new_text += new_line;
+
+		function get_initial_whitespace_count(line) {
+			for (var i = 0; i < line.length; i++)
+				if (!whitespace[line.charAt(i)])
+					return i;
+			return line.length;
+		}
+
+		if (current_text != new_text) {
+			// where was the cursor relative to the first non-white-space of the
+			// line!
+			var cursor = editor.getCursor();
+			cursor.ch -= get_initial_whitespace_count(editor.getLine(cursor.line));
+
+			editor.setValue(new_text);
+
+			// re-adjust the cursor position
+			cursor.ch += get_initial_whitespace_count(editor.getLine(cursor.line));
+
+			editor.setCursor(cursor);
+		}
+	}
+
+	var current_diff_markers = [];
+	function update_diff() {
+		// Uses text marks in the code editor to show text that was modified or inserted.
+
+		// clear any markers we set last time around
+		for (var i = 0; i < current_diff_markers.length; i++) current_diff_markers[i].clear();
+		current_diff_markers = [];
+
+		// track our position, and a utility function using a closure to add a marker
+		var line_no = 0;
+		var col_no = 0;
+		var prev_pos = {line: 0, ch: 0};
+		function mark_text(through_pos, className, is_deletion, replaced_text) {
+			var m;
+			if (!is_deletion) {
+				m = editor.markText(prev_pos, through_pos, { className: className })
+			} else {
+				m = editor.setBookmark(through_pos, { widget: $("<span class='editor_text_deleted'> </span>").text(replaced_text)[0] })
+			}
+			current_diff_markers.push(m);
+			prev_pos = through_pos;
+		}
 
 
 		/////////////////////////////////////////////////////////////
@@ -140,29 +267,29 @@
 		  var lineHash = {};
 		  lineArray[0] = '';
 		  function munge(text) {
-		    var chars = '';
-		    var lineStart = 0;
-		    var lineEnd = -1;
-		    var lineArrayLength = lineArray.length;
-		    while (lineEnd < text.length - 1) {
-		      split_regex.lastIndex = lineStart;
-		      var m = split_regex.exec(text);
-		      if (m)
-		      	lineEnd = m.index;
-		      else
-		        lineEnd = text.length - 1;
-		      var line = text.substring(lineStart, lineEnd + 1);
-		      lineStart = lineEnd + 1;
-		      if (lineHash.hasOwnProperty ? lineHash.hasOwnProperty(line) :
-		          (lineHash[line] !== undefined)) {
-		        chars += String.fromCharCode(lineHash[line]);
-		      } else {
-		        chars += String.fromCharCode(lineArrayLength);
-		        lineHash[line] = lineArrayLength;
-		        lineArray[lineArrayLength++] = line;
-		      }
-		    }
-		    return chars;
+			var chars = '';
+			var lineStart = 0;
+			var lineEnd = -1;
+			var lineArrayLength = lineArray.length;
+			while (lineEnd < text.length - 1) {
+			  split_regex.lastIndex = lineStart;
+			  var m = split_regex.exec(text);
+			  if (m)
+				lineEnd = m.index;
+			  else
+				lineEnd = text.length - 1;
+			  var line = text.substring(lineStart, lineEnd + 1);
+			  lineStart = lineEnd + 1;
+			  if (lineHash.hasOwnProperty ? lineHash.hasOwnProperty(line) :
+				  (lineHash[line] !== undefined)) {
+				chars += String.fromCharCode(lineHash[line]);
+			  } else {
+				chars += String.fromCharCode(lineArrayLength);
+				lineHash[line] = lineArrayLength;
+				lineArray[lineArrayLength++] = line;
+			  }
+			}
+			return chars;
 		  }
 
 		  var chars1 = munge(text1);
@@ -178,96 +305,96 @@
 		dmp.diff_charsToLines(diff, token_state.lineArray);
 		dmp.diff_cleanupSemantic(diff);
 
-	  	for (var i = 0; i < diff.length; i++) {
-	  		var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_modified" : "";
-	  		if (!diff[i][1].match(/\S/) || (i > 0 && i < diff.length-1 && diff[i][1].length < (diff[i-1][1].length+diff[i+1][1].length)/2)) {
-	  			// if a DIFF_EQUAL hunk is just whitespace or very short, display it as if it is
-	  			// a modification since it is probably a part of the same logical change as
-	  			// the hunks around it.
-	  			className = "editor_text_modified";
-	  		}
+		for (var i = 0; i < diff.length; i++) {
+			var className = (diff[i][0] != DIFF_EQUAL) ? "editor_text_inserted" : "";
+			if (!diff[i][1].match(/\S/) || (i > 0 && i < diff.length-1 && diff[i][1].length < (diff[i-1][1].length+diff[i+1][1].length)/2)) {
+				// if a DIFF_EQUAL hunk is just whitespace or very short, display it as if it is
+				// a modification since it is probably a part of the same logical change as
+				// the hunks around it.
+				className = "editor_text_inserted";
+			}
 
-	  		if (diff[i][0] != DIFF_DELETE) {
-		  		for (var c = 0; c < diff[i][1].length; c++) {
-		  			col_no++;
-		  			if (diff[i][1].charAt(c) == '\n') {
-		  				mark_text({line: line_no, ch: col_no}, className);
-		  				line_no++;
-		  				col_no = 0;
-		  			}
-		  		}
-		  	}
+			if (diff[i][0] != DIFF_DELETE) {
+				for (var c = 0; c < diff[i][1].length; c++) {
+					col_no++;
+					if (diff[i][1].charAt(c) == '\n') {
+						mark_text({line: line_no, ch: col_no}, className);
+						line_no++;
+						col_no = 0;
+					}
+				}
+			}
 
-		  	var replaced_text = diff[i][1];
+			var replaced_text = diff[i][1];
 			mark_text({line: line_no, ch: col_no}, className, diff[i][0] == DIFF_DELETE, replaced_text);
-	  	}
+		}
 	  }
 
-	  function on_change_delayed_2000() {
-	  	save_document();
-	  }
+	function on_change_delayed_2000() {
+		save_document();
+	}
 
-	  {% if !readonly %}
-	  function save_document() {
-	  	$.ajax(
-	  		"/save-patch-file",
-	  		{
-	  			data: {
-	  				patch: "{{patch.id}}",
-	  				file: "{{filename}}",
-	  				text: editor.getValue()
-	  			},
-	  			method: "POST",
-	  			success: function(res) {
-	  				if (res.status == "ok") {
-				  		$('#save_status').text("Saved.").attr("class", "text-muted");
-				  		has_unsaved_changes = false;
-	  				} else {
-				  		$('#save_status').text(res.msg);
-	  				}
-	  			},
-	  			error: function() {
-				  	$('#save_status').text("Error saving changes.");
-	  			},
-	  		});
-	  }
-	  {% endif %}
+	{% if !readonly %}
+	function save_document() {
+		$.ajax(
+			"/save-patch-file",
+			{
+				data: {
+					patch: "{{patch.id}}",
+					file: "{{filename}}",
+					text: editor.getValue()
+				},
+				method: "POST",
+				success: function(res) {
+					if (res.status == "ok") {
+						$('#save_status').text("Saved.").attr("class", "text-muted");
+						has_unsaved_changes = false;
+					} else {
+						$('#save_status').text(res.msg);
+					}
+				},
+				error: function() {
+					$('#save_status').text("Error saving changes.");
+				},
+			});
+	}
+	{% endif %}
 
-	  function update_preview() {
-	  	$.ajax(
-	  		"/render-body",
-	  		{
-	  			data: {
-	  				patch: "{{patch.id}}",
-	  				path: "{{filename}}",
-	  				text: editor.getValue()
-	  			},
-	  			method: "POST",
-	  			success: function(res) {
-	  				if (res.status == "ok")
-				  		$('#editor_preview #content').html(res.html);
-				  	else
-				  		$('#editor_preview  #content').text(res.error);
+	function update_preview() {
+		$.ajax(
+			"/render-body",
+			{
+				data: {
+					patch: "{{patch.id}}",
+					path: "{{filename}}",
+					text: editor.getValue()
+				},
+				method: "POST",
+				success: function(res) {
+					if (res.status == "ok")
+						$('#editor_preview #content').html(res.html);
+					else
+						$('#editor_preview  #content').text(res.error);
 
-				  	// make external links open in a new tab to not disturb the editor
-				  	$('#editor_preview a:not(.internal-link)').each(function() {
-				  		this.setAttribute("target", "_blank")
-				  	})
+					// make external links open in a new tab to not disturb the editor
+					$('#editor_preview a:not(.internal-link)').each(function() {
+						this.setAttribute("target", "_blank")
+					})
 
-				  	// make internal links open the editor on that file
-				  	$('#editor_preview a.internal-link').each(function() {
-				  		this.setAttribute("href", "{{patch.edit_url}}/editor?file={% if dirname != '.' %}{{dirname}}/{% endif %}" + this.getAttribute('href').replace(/\.html/, ".xml"));
-				  	})
-	  			},
-	  			error: function() {
-				  	$('#editor_preview #content').text("Error creating the preview.");
-	  			},
-	  		});
-	  }
+					// make internal links open the editor on that file
+					$('#editor_preview a.internal-link').each(function() {
+						this.setAttribute("href", "{{patch.edit_url}}/editor?file={% if dirname != '.' %}{{dirname}}/{% endif %}" + this.getAttribute('href').replace(/\.html/, ".xml"));
+					})
+				},
+				error: function() {
+					$('#editor_preview #content').text("Error creating the preview.");
+				},
+			});
+	}
 
-	  function no_linking() {
-	  	show_modal_error('Internal Link', 'Internal citation links are not supported in the code editor.');
-	  }
+	function no_linking() {
+		show_modal_error('Internal Link', 'Internal citation links are not supported in the code editor.');
+	}
 
 	</script>
 
