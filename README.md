@@ -7,9 +7,10 @@ patch and publishing process.
 Setup
 -----
 
-This repository has been tested with Ubuntu 13.10.
+This repository has been tested with Ubuntu 13.10 and node v0.10.26.
 
-	# clone this repo, activate your nvm, etc.
+	git clone --recursive https://github.com/JoshData/dc-code-editor
+	nvm use v0.10.26 # assuming you use nvm to manage multiple node versions
 
 	# pull in external modules
 	git submodule update --init
