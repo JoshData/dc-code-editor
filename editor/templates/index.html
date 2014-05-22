@@ -141,7 +141,6 @@ function do_export_code() {
 			ajax_call(
 				"/_export_code",
 				{
-					head: "{{head_patch.id}}"
 				},
 				function(res) {
 					show_modal_error("Export Code", "The export is complete.");

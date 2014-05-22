@@ -119,6 +119,7 @@ exports.getTree = function(callback) {
 			return {
 				indent: depth,
 
+				patch: patch,
 				id: patch.id,
 				uuid: patch.uuid,
 				type: patch.type,
@@ -849,13 +850,25 @@ Patch.prototype.getDiff = function(callback) {
 	);
 }
 
-Patch.prototype.export_code = function(callback) {
-	// This patch is the last commit to export. Creates a git commit
-	// for each patch. Calls callback(err, array_of_git_outputs).
+exports.export_code = function(callback) {
+	// Creates a new branch in the code repository dated today and commits
+	// each patch from the beginning onto it. If early patches haven't changed,
+	// git is smart enough not to create new commit objects. The common
+	// history of branches will be the same commits.
+	//
+	// Calls callback(err, [gitoutputs]).
 
-	// Get the history of this patch. We'll turn each patch in the history
-	// into a commit in the local code repository.
-	this.getAncestorsAndMe(function(patch_history) {
+	// Get the code history of this patch.
+	exports.getTree(function(patch_history) {
+		// We get the tree in reverse-chronological order with each record
+		// an array containing the main-line patch and any auxiliary children
+		// (like we display it). Also we get a dict with various pre-loaded
+		// info for display. Just get the patch objects on the main line.
+		patch_history.reverse();
+		for (var i = 0; i < patch_history.length; i++)
+			patch_history[i] = patch_history[i][0].patch;
+
+		// Sanity check.
 		if (patch_history[0].type != "root") {
 			callback("Invalid initial patch.");
 			return;
@@ -864,49 +877,28 @@ Patch.prototype.export_code = function(callback) {
 		// remove the root patch from the history since we never commit it
 		var root_patch = patch_history.shift();
 
-		// see where the repository is
-		repo.get_repository_head(function(head_hash) {
-			// If we've already exported the code, then a range of patches
-			// starting with the root may already have export_hashes filled
-			// in. But those patches may have changed! Like if there's a
-			// technical correction. So we will in that case have to write
-			// a commit for any corrections.
+		if (patch_history.length == 0) {
+			callback("There is nothing to export.");
+			return;
+		}
 
-			// Pop off any ancestors (most ancient first) that have already
-			// been committed, but remember the last one.
-			var last_commited_patch = null;
-			var all_changed_paths = { };
-			while (patch_history.length > 0 && patch_history[0].export_hashes.length > 0) {
-				last_commited_patch = patch_history.shift();
-				Object.keys(last_commited_patch.files).forEach(function(item) { all_changed_paths[item] = true });
-			}
+		// make a new branch
+		var branch_name = "release_" + new Date().toISOString().replace(/[^0-9]/g, "");
+		repo.branch(
+			branch_name,
+			root_patch.hash,
+			function(err) {
 
-			if ((last_commited_patch == null && root_patch.hash != head_hash)
-				|| (last_commited_patch != null && last_commited_patch.export_hashes.indexOf(head_hash) == -1)) {
-				callback("The repository is positioned on a commit that does not correspond to a patch we know about.");
-				return;
-			}
-			if (patch_history.length == 0 && last_commited_patch == null) {
-				callback("There is nothing to export.");
+			if (err) {
+				callback(err);
 				return;
 			}
 
 			// start committing!
 			async.mapSeries(
-				[-1].concat(patch_history),
+				patch_history,
 				function(item, callback) {
-					if (item == -1) {
-						// Loop through all of its changed paths between the root and
-						// the last committed revision (inclusive), and write any
-						// changed paths as a correction commit.
-						last_commited_patch.commit(
-							Object.keys(all_changed_paths),
-							"corrections",
-							callback);
-
-					} else {
-						item.commit(null, null, callback)
-					}
+					item.commit(null, null, callback)
 				},
 				callback
 			)
@@ -920,6 +912,7 @@ Patch.prototype.commit = function(changed_paths, message, callback) {
 	// or deleted files (add -A), commits the result (commit -m),
 	// and calls callback with (err, hash, commit_output).
 	var patch = this;
+	if (!patch.effective_date) { callback("Patch " + patch.id + " does not have an effective date set."); return; }
 	repo.clean_working_tree(function() {
 		// make the modifications specified by this patch in the working tree of the repository
 		async.map(
@@ -936,17 +929,11 @@ Patch.prototype.commit = function(changed_paths, message, callback) {
 				if (err) { callback(err); return; }
 				repo.commit(
 					message || patch.id + "\n\n" + patch.notes,
-					"authorname",
-					"test@example.org",
+					settings.committer_name,
+					settings.committer_email,
+					new Date(patch.effective_date).toISOString(),
 					function(commit_output) {
 						repo.get_repository_head(function(commit_hash) {
-							// since the commit might be silently skipped if there are
-							// no changes in this patch, we may see the hash multiple times,
-							// but only add it once.
-							if (patch.export_hashes.indexOf(commit_hash) == -1)
-								patch.export_hashes.push(commit_hash);
-							patch.save();
-
 							callback(null, [commit_hash, commit_output]);
 						})
 					});

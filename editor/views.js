@@ -352,8 +352,7 @@ exports.set_routes = function(app) {
 
 	// Export The Code!
 	app.post('/_export_code', function(req, res){
-		var patch = patches.Patch.load(req.body.head);
-		patch.export_code(function(err, results) {
+		patches.export_code(function(err, results) {
 			res.setHeader('Content-Type', 'application/json');
 			res.send(JSON.stringify({
 				"status": (!err ? "ok" : "error"),

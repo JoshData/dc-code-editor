@@ -15,6 +15,7 @@ function execute_git(args, env, callback) {
 
 	var child_process = require("child_process");
 	var output = "";
+	var error_output = "";
 	var git = child_process.spawn(
 		"git",
 		args,
@@ -23,11 +24,19 @@ function execute_git(args, env, callback) {
 			encoding: 'utf8',
 			cwd: settings.code_directory
 		});
+	console.log("git", settings.code_directory, args, env);
 	git.stdout.on('data', function (data) {
 	  output += data;
 	});
+	git.stderr.on('data', function (data) {
+	  error_output += data;
+	});
 	git.on('close', function(exit_code) {
-		if (exit_code != 0) throw "git returned non-zero exit status. Arguments: " + args.join(", ") + ". Output: " + output;
+		if (exit_code != 0) {
+			console.log(error_output);
+			console.log(output);
+			throw "git returned non-zero exit status. Arguments: " + args.join(", ");
+		}
 		callback(output);
 	});
 }
@@ -93,6 +102,10 @@ exports.cat = function(hash, path, callback) {
 	execute_git(["show", hash + ":" + path], null, callback);
 }
 
+exports.branch = function(branch_name, base_commit, callback) {
+	execute_git(["checkout", "-b", branch_name, base_commit ], null, function(output) { callback(); });
+}
+
 exports.clean_working_tree = function(callback) {
 	// Calls "git reset --hard".
 	execute_git(["reset", "--hard" ], null, function(output) { callback(); });
@@ -115,7 +128,7 @@ exports.delete_working_tree_path = function(path, callback) {
 	fs.unlink(fn, function(err) { callback(); }) // ignore error (hmmm...)
 }
 
-exports.commit = function(message, author_name, author_email, callback) {
+exports.commit = function(message, author_name, author_email, commit_date, callback) {
 	// Performs a commit using "git add -A" and "git commit".
 	execute_git(["add", "-A"], null, function() {
 		execute_git(["status"], null, function(status_output) {
@@ -125,15 +138,18 @@ exports.commit = function(message, author_name, author_email, callback) {
 				return;
 			}
 
+			// don't sign the commits so long as we're expecting tha re-exporting a patch
+			// should not change the commit hash, because signing a commit makes the hash
+			// sensitive to the current time (or at least something that changes each time)
 			execute_git(
-				["commit",  "-m", message],
+				["commit", "-m", message],
 				{
 		           GIT_AUTHOR_NAME: author_name,
 		           GIT_AUTHOR_EMAIL: author_email,
-		           //GIT_AUTHOR_DATE
+		           GIT_AUTHOR_DATE: commit_date,
 		           GIT_COMMITTER_NAME: author_name,
-		           GIT_COMMITTER_EMAIL: author_email
-		           //GIT_COMMITTER_DATE
+		           GIT_COMMITTER_EMAIL: author_email,
+		           GIT_COMMITTER_DATE: commit_date,
 				},
 				callback
 			);		
