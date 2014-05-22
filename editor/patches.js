@@ -418,6 +418,8 @@ Patch.prototype.getPaths = function(path, recursive, with_deleted_files, callbac
 
 exports.sort_paths = function(path_list) {
 	function cmp(a, b) {
+		if (!a) return -1;
+		if (!b) return 1;
 		var x = parseInt(a) - parseInt(b);
 		if (x) return x; // not NaN (strings arent ints) and not zero
 		return a.localeCompare(b);
