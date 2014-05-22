@@ -372,11 +372,22 @@ Patch.prototype.getPaths = function(path, recursive, with_deleted_files, callbac
 					// If recurse is false, look at entries that are immediate children of the requested path.
 					// Otherwise, look at entries that are a descendant of the path.
 					var name = null;
+					var type = entry.type;
 					if (!recursive) {
 						// if it's an immediate child of path, the returned name
 						// is the base name of the child path.
 						if (pathlib.dirname(entry) == path || (path == null && pathlib.dirname(entry) == '.'))
 							name = pathlib.basename(entry);
+
+						// if it's a non-immediate child of path but in a directory that didn't
+						// exist in the base, add the immediate directory
+						else if ((pathlib.dirname(entry)+"/").substring(0, path.length+1) == path+"/") {
+							name = entry.substring(path.length+1); // the relative path
+							while (pathlib.dirname(name) != '.') // back off until we get to the top-most directory
+								name = pathlib.dirname(name);
+							type = 'tree';
+						}
+
 					} else if (path == null) {
 						// no path and looking recursively, so the path to return is
 						// the raw entry path
@@ -396,13 +407,10 @@ Patch.prototype.getPaths = function(path, recursive, with_deleted_files, callbac
 							delete ret[name];
 					} else {
 						ret[name] = {
-							type: 'blob',
+							type: type,
 							name: name
 						};
 					}
-
-					// TODO: Or if there is a path (except deletions) that are in a subpath of
-					// the requested path, add in new directories.
 
 					// TOOD: How would deleted directories be reflected?
 				}
