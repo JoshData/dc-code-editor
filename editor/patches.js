@@ -882,11 +882,9 @@ exports.export_code = function(callback) {
 			return;
 		}
 
-		// make a new branch
-		var branch_name = "release_" + new Date().toISOString().replace(/[^0-9]/g, "");
-		repo.branch(
+		// start from the base patch's commit
+		repo.checkout_detached_head(
 			settings.code_directory,
-			branch_name,
 			root_patch.hash,
 			function(err) {
 
@@ -901,7 +899,27 @@ exports.export_code = function(callback) {
 				function(item, callback) {
 					item.commit(null, null, callback)
 				},
-				callback
+				function(err, results) {
+					if (err) { callback(err); return; }
+
+					// Make a signed tag for the last commit. We don't sign
+					// the individual commits because each time we export the
+					// hashes will change. Rather, we want to take advantage of
+					// the hashes being stable (so long as the patch doesn't change)
+					// so that re-exporting over and over won't blow up the repository.
+					repo.get_repository_head(settings.code_directory, null, function(hash) {
+						var tag_name = "release_" + new Date().toISOString().replace(/[^0-9]/g, "");
+						repo.tag(
+							settings.code_directory,
+							hash,
+							tag_name,
+							"official code export",
+							true,
+							settings.committer_name,
+							settings.committer_email,
+							callback);
+					});
+				}
 			)
 		});
 

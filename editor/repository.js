@@ -41,7 +41,9 @@ function execute_git(dir, args, env, callback) {
 
 exports.get_repository_head = function(dir, branch, callback) {
 	// Gets the hash corresponding to the head commit of a branch (asynchronously).
-	execute_git(dir, ["show", branch], null, function(output) {
+	var args = ["show"];
+	if (branch) args.push(branch);
+	execute_git(dir, args, null, function(output) {
 		var first_line = output.split("\n")[0].split(" ");
 		if (first_line[0] != "commit") throw "invalid git output";
 		callback(first_line[1]);
@@ -104,6 +106,10 @@ exports.branch = function(dir, branch_name, base_commit, callback) {
 	execute_git(dir, ["checkout", "-b", branch_name, base_commit ], null, function(output) { callback(); });
 }
 
+exports.checkout_detached_head = function(dir, head, callback) {
+	execute_git(dir, ["checkout", head ], null, function(output) { callback(); });
+}
+
 exports.clean_working_tree = function(dir, callback) {
 	// Calls "git reset --hard".
 	execute_git(dir, ["reset", "--hard" ], null, function(output) { callback(); });
@@ -141,6 +147,22 @@ exports.commit = function(dir, message, author_name, author_email, commit_date, 
 			);		
 		});
 	})
+}
+
+exports.tag = function(dir, commit, tagname, message, sign, author_name, author_email, callback) {
+	var args = ["tag", "-m", message];
+	if (sign) { args.push("-s"); }
+	args.push(tagname);
+	args.push(commit);
+	execute_git(
+		dir,
+		args,
+		{
+	        GIT_COMMITTER_NAME: author_name,
+	        GIT_COMMITTER_EMAIL: author_email
+	    },
+		callback
+	);
 }
 
 exports.check_if_gpg_key_exists = function(emailaddr, callback) {
