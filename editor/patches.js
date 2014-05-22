@@ -59,7 +59,7 @@ function getAllPatchIds(callback) {
 function createRootPatch(callback) {
 	// Create a "root patch" that represents the state of the
 	// code as of what's given in the base code directory.
-	repo.get_repository_head(function(hash) {
+	repo.get_repository_head(settings.code_directory, settings.code_branch, function(hash) {
 		var p = new_patch_internal(new Patch({
 			"id": "root-" + hash.substring(0, 6),
 			"type": "root",
@@ -355,7 +355,7 @@ Patch.prototype.getPaths = function(path, recursive, with_deleted_files, callbac
 
 	if (this.type == "root") {
 		// Go to the repository to get the files in the indicated path.
-		repo.ls(this.hash, path, recursive, callback);
+		repo.ls(settings.code_directory, this.hash, path, recursive, callback);
 	} else {
 		// Get the files in the base patch, never including files
 		// deleted in the base patch.
@@ -498,7 +498,7 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 			if (!exists)
 				callback(null, "");
 			else
-				repo.cat(myhash, path, function(blob) { callback(null, blob); } );
+				repo.cat(settings.code_directory, myhash, path, function(blob) { callback(null, blob); } );
 		});
 	} else {
 		var dirname = settings.workspace_directory + "/" + this.id;
@@ -885,6 +885,7 @@ exports.export_code = function(callback) {
 		// make a new branch
 		var branch_name = "release_" + new Date().toISOString().replace(/[^0-9]/g, "");
 		repo.branch(
+			settings.code_directory,
 			branch_name,
 			root_patch.hash,
 			function(err) {
@@ -913,29 +914,47 @@ Patch.prototype.commit = function(changed_paths, message, callback) {
 	// and calls callback with (err, hash, commit_output).
 	var patch = this;
 	if (!patch.effective_date) { callback("Patch " + patch.id + " does not have an effective date set."); return; }
-	repo.clean_working_tree(function() {
+
+	function write_working_tree_path(path, content, callback) {
+		// Writes the content to the working tree path. 
+		var mkdirp = require('mkdirp');
+		var fn = pathlib.join(settings.code_directory, path);
+		mkdirp(pathlib.dirname(fn), function(err) {
+			if (err)
+				callback(err)
+			else
+				fs.writeFile(fn, content, callback);
+		});
+	}
+
+	function delete_working_tree_path(path, callback) {
+		var fn = pathlib.join(settings.code_directory, path);
+		fs.unlink(fn, function(err) { callback(); }) // ignore error (hmmm...)
+	}
+
+	repo.clean_working_tree(settings.code_directory, function() {
 		// make the modifications specified by this patch in the working tree of the repository
 		async.map(
 			changed_paths || Object.keys(patch.files),
 			function(changed_path, callback) {
 				patch.getPathContent(changed_path, false, function(base_content, current_content) {
 					if (current_content != "")
-						repo.write_working_tree_path(changed_path, current_content, callback);
+						write_working_tree_path(changed_path, current_content, callback);
 					else
-						repo.delete_working_tree_path(changed_path, callback);
+						delete_working_tree_path(changed_path, callback);
 				});
 			},
 			function(err, results) {
 				if (err) { callback(err); return; }
 				repo.commit(
+					settings.code_directory,
 					message || patch.id + "\n\n" + patch.notes,
 					settings.committer_name,
 					settings.committer_email,
 					new Date(patch.effective_date).toISOString(),
+					false, // don't sign because it will change the hash
 					function(commit_output) {
-						repo.get_repository_head(function(commit_hash) {
-							callback(null, [commit_hash, commit_output]);
-						})
+						callback(null, commit_output);
 					});
 			}
 		);

@@ -350,6 +350,25 @@ exports.set_routes = function(app) {
 		});
 	});
 
+	// Commit the Workspace!
+	app.post('/_commit_workspace', function(req, res){
+		var repo = require("./repository.js");
+		repo.commit(
+			settings.workspace_directory,
+			"committing workspace",
+			settings.committer_name,
+			settings.committer_email,
+			null, // commit date = current date
+			true, // sign
+			function(output) {
+				res.setHeader('Content-Type', 'application/json');
+				res.send(JSON.stringify({
+					"status": "error",
+					"msg": output
+				}));
+		});
+	});
+
 	// Export The Code!
 	app.post('/_export_code', function(req, res){
 		patches.export_code(function(err, results) {

@@ -16,6 +16,7 @@ This repository has been tested with Ubuntu 13.10 and node v0.10.26.
 	git submodule update --init
 
 	# install dependencies
+	sudo apt-get install gpg2
 	npm install
 
 	# install dependencies of simple-2
@@ -31,6 +32,11 @@ This repository has been tested with Ubuntu 13.10 and node v0.10.26.
 	# download the DC Code
 	git clone https://github.com/JoshData/dc-code-prototype base_code
 
+	# make a workspace directory
+	git init workspace
+
+	# create a signing key for your committer_name/committer_email in settings.js.
+	gpg2 --gen-key
 
 Run
 ---

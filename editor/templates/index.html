@@ -5,6 +5,7 @@
 {% block body %}
 <div class="container">
 	<div style="float: right; text-align: right">
+		<a href="#" onclick="return do_commit_workspace()" class="btn btn-warning">Commit Workspace</a>
 		<a href="#" onclick="return do_export_code()" class="btn btn-warning">Export the Code</a>
 	</div>
 
@@ -130,6 +131,26 @@ $(function() {
         }
     });
 });
+
+function do_commit_workspace() {
+	show_modal_confirm(
+		"Commit Workspace",
+		"Are you ready to make a git commit for the workspace?",
+		"Commit",
+		function() {
+			// user says go for it
+			ajax_call(
+				"/_commit_workspace",
+				{
+				},
+				function(res) {
+					show_modal_error("Commit Workspace", "Done.");
+				},
+				"Commit Workspace"
+			);
+		});
+	return false;
+}
 
 function do_export_code() {
 	show_modal_confirm(
