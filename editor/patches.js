@@ -381,8 +381,11 @@ Patch.prototype.getPaths = function(path, recursive, with_deleted_files, callbac
 
 						// if it's a non-immediate child of path but in a directory that didn't
 						// exist in the base, add the immediate directory
-						else if ((pathlib.dirname(entry)+"/").substring(0, path.length+1) == path+"/") {
-							name = entry.substring(path.length+1); // the relative path
+						else if (path == null || ((pathlib.dirname(entry)+"/").substring(0, path.length+1) == path+"/")) {
+							if (path == null)
+								name = entry;
+							else
+								name = entry.substring(path.length+1); // the relative path
 							while (pathlib.dirname(name) != '.') // back off until we get to the top-most directory
 								name = pathlib.dirname(name);
 							type = 'tree';
