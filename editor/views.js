@@ -312,14 +312,14 @@ exports.set_routes = function(app) {
 						var other_dom = et.parse(patch_content)._root;
 						callback(null, [fn, other_dom]);
 					} catch (e) {
-						callback(e);
+						callback("Invalid XML in included file " + fn + ": " + e);
 					}
 				})
 			},
 			function(err, results) {
 				if (err) {
 					res.writeHead(200, {'Content-Type': 'application/json'});
-					res.write(JSON.stringify( { "error": "Invalid XML in included file " + elem.get("href") + ": " + e } ));
+					res.write(JSON.stringify( { "error": err } ));
 					res.end();
 					return;
 				}
