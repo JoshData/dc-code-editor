@@ -115,11 +115,20 @@ exports.clean_working_tree = function(dir, callback) {
 	execute_git(dir, ["reset", "--hard" ], null, function(output) { callback(); });
 }
 
+exports.is_working_tree_dirty = function(dir, callback) {
+	execute_git(dir, ["status"], null, function(status_output) {
+		if (status_output.indexOf("nothing to commit, working directory clean") != -1)
+			callback(false);
+		else
+			callback(true);
+	});
+}
+
 exports.commit = function(dir, message, author_name, author_email, commit_date, sign, callback) {
 	// Performs a commit using "git add -A" and "git commit".
 	execute_git(dir, ["add", "-A"], null, function() {
-		execute_git(dir, ["status"], null, function(status_output) {
-			if (status_output.indexOf("nothing to commit, working directory clean") != -1) {
+		exports.is_working_tree_dirty(dir, function(is_dirty) {
+			if (!is_dirty) {
 				// Nothing to commit. Silently don't do a commit.
 				callback("Nothing to commit.");
 				return;

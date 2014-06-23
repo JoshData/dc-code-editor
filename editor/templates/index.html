@@ -5,7 +5,7 @@
 {% block body %}
 <div class="container">
 	<div style="float: right; text-align: right">
-		<a href="#" onclick="return do_commit_workspace()" class="btn btn-warning">Commit Workspace</a>
+		<a id="commit_workspace" href="#" onclick="return do_commit_workspace()" class="btn btn-warning {% if not workspace_is_dirty %}disabled{% endif %}">Commit Workspace</a>
 		<a href="#" onclick="return do_export_code()" class="btn btn-warning">Export the Code</a>
 	</div>
 
@@ -115,6 +115,7 @@ $(function() {
 						function(res) {
 							// it worked, so keep the sort order...
 							update_effective_date_warnings()
+							$('#commit_workspace').removeClass('disabled')
 						},
 						"Move",
 
@@ -145,6 +146,7 @@ function do_commit_workspace() {
 				},
 				function(res) {
 					show_modal_error("Commit Workspace", "Done.");
+					$('#commit_workspace').addClass('disabled')
 				},
 				"Commit Workspace"
 			);

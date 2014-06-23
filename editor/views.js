@@ -2,6 +2,7 @@ var swig  = require('swig');
 var pathlib  = require('path');
 var async = require('async');
 var patches = require("./patches.js");
+var repo = require("./repository.js");
 
 var settings = require("./settings.js");
 
@@ -12,12 +13,24 @@ exports.set_routes = function(app) {
 	var home_template = swig.compileFile(__dirname + '/templates/index.html');
 	app.get('/', function(req, res){
 		res.setHeader('Content-Type', 'text/html');
-		patches.getTree(function(patch_tree) {
-			res.send(home_template({
-				patch_tree: patch_tree,
-				head_patch: patch_tree[0][0]
-			}));
-		});
+
+		async.parallel({
+			patch_tree: function(callback) {
+				patches.getTree(function(patch_tree) { callback(null, patch_tree) });
+				},
+			workspace_is_dirty: function(callback) {
+				repo.is_working_tree_dirty(settings.workspace_directory, function(is_dirty) { callback(null, is_dirty) });
+				}
+			},
+			function(err, results) {
+				res.send(home_template({
+					patch_tree: results.patch_tree,
+					head_patch: results.patch_tree[0][0],
+					workspace_is_dirty: results.workspace_is_dirty
+				}));
+			}
+		)
+
 	});
 
 	// Patch Edit
@@ -352,7 +365,6 @@ exports.set_routes = function(app) {
 
 	// Commit the Workspace!
 	app.post('/_commit_workspace', function(req, res){
-		var repo = require("./repository.js");
 		repo.commit(
 			settings.workspace_directory,
 			"committing workspace",
@@ -363,7 +375,7 @@ exports.set_routes = function(app) {
 			function(output) {
 				res.setHeader('Content-Type', 'application/json');
 				res.send(JSON.stringify({
-					"status": "error",
+					"status": "ok",
 					"msg": output
 				}));
 		});
