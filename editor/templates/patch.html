@@ -69,44 +69,60 @@
 
 		<div class="col-sm-6">
 			{% if !readonly %}
-				<h2>Edit {% if patch.has_changes %}New{% endif %} File...</h2>
-				<p>Choose a file below to modify it:</p>
+				<h2>Edit File...</h2>
 			{% else %}
 				<h2>View File</h2>
-				{% if patch.type == "root" %}
-					<p>The files cannot be modified in a root patch.</p>
-				{% else %}
-					<p>The files cannot be modified in this patch because there are other patches that continue from it. To modify this patch, first start a <a href="{{patch.edit_url}}/_new">revision patch</a> and then merge the patches.</p>
-				{% endif %}
 			{% endif %}
-
-			<ul style="list-style: none; padding: 0;">
-			{% if path_up %}
-				<p><strong>{{path}}</strong></p>
-				<li>[<a href="{{patch.edit_url}}{% if path_up != "." %}?path={{path_up}}{% endif %}">&mdash; go up a level &mdash;</a>]</li>
-			{% endif %}
-			{% for entry in files %}
-			<li>
-				{% if entry.type == "tree" %}
-					<a href="{{patch.edit_url}}?path={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>/...
-				{% else %}
-					<a href="{{patch.edit_url}}/editor?file={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>
-				{% endif %}
-			</li>
-			{% endfor %}
-			</ul>
 
 			{% if !readonly %}
-				<h3>Create New File</h3>
-				<p>Create a new file in {% if !path_up %}this directory{% else %}{{path}}{% endif %}.</p>
-				<form role="form" onsubmit="return do_new_file()">
-				  <div class="form-group">
-				    <label for="newfileFilename">File Name</label>
-				    <input type="text" class="form-control" id="newfileFilename" placeholder="299-001.xml">
-				  </div>
-				  <button type="submit" class="btn btn-default">Create</button>
-				</form>				
+			<ul class="nav nav-tabs">
+				<li class="active"><a href="#file-list" data-toggle="tab">File List</a></li>
+				<li><a href="#new-file" data-toggle="tab">New File</a></li>
+			</ul>
 			{% endif %}
+
+			<div class="tab-content" style="padding-top: 1em">
+				<div class="tab-pane active" id="file-list">
+					{% if !readonly %}
+						<p>Choose a file below to modify it:</p>
+					{% else %}
+						{% if patch.type == "root" %}
+							<p>The files cannot be modified in a root patch.</p>
+						{% else %}
+							<p>The files cannot be modified in this patch because there are other patches that continue from it. To modify this patch, first start a <a href="{{patch.edit_url}}/_new">revision patch</a> and then merge the patches.</p>
+						{% endif %}
+					{% endif %}
+
+					<ul style="list-style: none; padding: 0;">
+					{% if path_up %}
+						<p><strong>{{path}}</strong></p>
+						<li>[<a href="{{patch.edit_url}}{% if path_up != "." %}?path={{path_up}}{% endif %}">&mdash; go up a level &mdash;</a>]</li>
+					{% endif %}
+					{% for entry in files %}
+					<li>
+						{% if entry.type == "tree" %}
+							<a href="{{patch.edit_url}}?path={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>/...
+						{% else %}
+							<a href="{{patch.edit_url}}/editor?file={% if path %}{{path}}/{% endif %}{{entry.name}}">{{entry.name}}</a>
+						{% endif %}
+					</li>
+					{% endfor %}
+					</ul>
+				</div>
+
+				{% if !readonly %}
+					<div class="tab-pane" id="new-file">
+						<p>Create a new file in {% if !path_up %}this directory{% else %}{{path}}{% endif %}.</p>
+						<form role="form" onsubmit="return do_new_file()">
+						  <div class="form-group">
+						    <label for="newfileFilename">File Name</label>
+						    <input type="text" class="form-control" id="newfileFilename" placeholder="299-001.xml">
+						  </div>
+						  <button type="submit" class="btn btn-default">Create</button>
+						</form>
+					</div>
+				{% endif %}
+			</div>
 
 		</div>
 	</div>
@@ -121,6 +137,8 @@
 {% block scripts %}
 <script>
 	$(function() {
+		// prevent jumping when switching tabs
+		$('#new-file').css({ minHeight: $('#file-list').height() })
 
 		$('#patch_actions span').css({cursor: "pointer"}).click(function() {
 			if (this.getAttribute("id") == "patch_merge_up")
