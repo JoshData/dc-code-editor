@@ -257,7 +257,6 @@ Patch.load = function(patch_id) {
 	patch.id = patch_id;
 	patch.edit_url = "/patch/" + patch_id;
 	if (patch.type != "root" && patch.children == 0) patch.can_modify = true;
-	patch.export_hashes = patch.export_hashes || [];
 
 	// parse some fields
 	patch.created = new Date(patch.created);
