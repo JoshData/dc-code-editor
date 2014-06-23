@@ -651,13 +651,6 @@ Patch.prototype.delete = function(callback, force) {
 
 	var patch = this;
 
-	// A patch can't be deleted if there are patches that referecne it. A
-	// more complex operation would be needed to rebase child content.
-	if (this.children.length > 0) {
-		callback("A patch cannot be deleted when there are patches applied after it.");
-		return;
-	}
-
 	// Is this patch a no-op? In parallel, look at each modified file.
 	// See if the new contents differ from the old contents. Doing
 	// this asynchronously unfortunately makes this very hard to read.
@@ -686,7 +679,13 @@ Patch.prototype.delete = function(callback, force) {
 			// keeping just the strings which are the paths of modified files.
 			results = results.filter(function(item) { return item != null; });
 			if (results.length > 0) {
-				callback("This patch cannot be deleted while there are modifications in " + results.length + " file(s). Use 'force' to delete this patch.", results.length);
+				// A patch that's not a no-op can't be deleted if the patch has children. A
+				// more complex operation would be needed to rebase child content.
+				if (patch.children.length > 0)
+					callback("A patch cannot be deleted when there are patches applied after it.");
+				else
+					callback("This patch cannot be deleted while there are modifications in " + results.length + " file(s). Use 'force' to delete this patch.",
+						results.length);
 				return;
 			}
 
