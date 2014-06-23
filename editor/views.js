@@ -89,10 +89,18 @@ exports.set_routes = function(app) {
 	app.get('/patch/:patch/_new', function(req, res){
 		var patch = patches.Patch.load(req.params.patch);
 		patch = patch.createChild();
-		if (!req.query.file)
-			res.redirect(patch.edit_url);
+
+		function do_redirect(err, patch) {
+			if (!req.query.file)
+				res.redirect(patch.edit_url);
+			else
+				res.redirect(patch.edit_url + "/editor?file=" + req.query.file);
+		}
+
+		if (req.query.name)
+			patch.rename(req.query.name, do_redirect)
 		else
-			res.redirect(patch.edit_url + "/editor?file=" + req.query.file);
+			do_redirect(null, patch);
 	});
 
 	// Rename/Delete/Modify Patch

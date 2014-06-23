@@ -23,7 +23,7 @@
 			{% for child in child_patches %}
 				<a href="{{child.edit_url}}/editor?file={{filename}}">{{child.id}}</a> |
 			{% endfor %}
-			<a href="{{patch.edit_url}}/_new?file={{filename}}">New Patch</a>
+			[<a href="{{patch.edit_url}}/_new?file={{filename}}">Start New Patch</a>]
 		</div>
 	</div>
 	<h1 style="margin: 0">{{filename}}</h1>

@@ -15,9 +15,17 @@
 		<div class="uparrow"> </div>
 		<div class="timeline-row">
 			<div class="timeline-patch" style="padding-bottom: 30px">
-				<a href="{{head_patch.edit_url}}/_new"  class="btn btn-success">New Patch</a>
+
+				<form class="form-inline" role="form" action="{{head_patch.edit_url}}/_new" onclick="return validate_new_patch_name();">
+				  <div class="form-group">
+				    <input name="name" type="text" class="form-control" id="new-patch-name" placeholder="L20-0108" onkeyup="update_new_patch_disabled()" onchange="update_new_patch_disabled()">
+				  </div>
+				  <button id="new-patch-submit" type="submit" class="btn btn-default disabled">New Patch</button>
+				  <p class="small text-muted" style="margin-top: .5em">examples: L20-0123, L20-0123A, L20-0123_title_1, A53-123, 20-technical_correction-1</p>
+				</form>
 			</div>
 		</div>
+
 		<div id="timeline-patches">
 		{% for patch_array in patch_tree %}
 		<div class="timeline-group" data-patch-id="{{patch_array[0].id}}">
@@ -52,6 +60,17 @@
 {% block scripts %}
 <script>
 var are_effective_dates_in_order = false;
+
+function update_new_patch_disabled() {
+	$('#new-patch-submit').toggleClass('disabled', !validate_new_patch_name());
+}
+function validate_new_patch_name() {
+	// Check that a patch name looks like one of these:
+	//   L20-0123, L20-0123A, A53-123, 20 (our own thing for a correction)
+	// Plus "_anything" optionally.
+	var val = $('#new-patch-name').val();
+	return /^(L\d{2}-\d{4}[A-Z]?|A\d+-\d+|\d{2}-[A-Za-z0-9\-_]+)(_[A-Za-z0-9\-_]+)?$/.exec(val);
+}
 
 function update_effective_date_warnings() {
 	$('#timeline-patches .spine').removeClass("invalid-date");
