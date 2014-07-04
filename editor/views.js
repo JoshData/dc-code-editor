@@ -329,6 +329,13 @@ exports.set_routes = function(app) {
 			function(item, callback) {
 				var fn = pathlib.join(pathlib.dirname(req.body.path), item);
 				patch.getPathContent(fn, false, function(base_content, patch_content) {
+					if (patch_content.length == 0) {
+						// Empty content indicates a file that does not exist in the
+						// tree in this patch.
+						callback("Included file \"" + fn + "\" does not exist.");
+						return;
+					}
+
 					try {
 						var other_dom = et.parse(patch_content)._root;
 						callback(null, [fn, other_dom]);
