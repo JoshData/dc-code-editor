@@ -233,6 +233,7 @@ exports.set_routes = function(app) {
 					readonly: !has_base_text || (patch.children.length > 0),
 					filename: filename,
 					dirname: pathlib.dirname(filename),
+					parentfilename: get_parent_path(filename),
 					base_patch: resources.content.base_patch,
 					child_patches: resources.children,
 					base_text: JSON.stringify(resources.content.base_text),
@@ -517,6 +518,18 @@ function finish_preview(fn, dom, other_resources, res) {
 	}));
 }
 
+function get_parent_path(path) {
+	// The parent of index.xml files are index.xml in the parent
+	// directory. The parents of other files are the index.xml in
+	// the same directory.
+	if (path == "index.xml") return null; // root of DOM
+	var parentdir;
+	if (pathlib.basename(path) == "index.xml")
+		parentdir = pathlib.dirname(pathlib.dirname(path));
+	else
+		parentdir = pathlib.dirname(path);
+	return pathlib.join(parentdir, 'index.xml');
+}
 
 function get_macros(macro_type) {
 	var glob = require("glob");

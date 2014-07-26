@@ -16,6 +16,13 @@
 	<div class="row">
 		<div class="col-xs-6">
 			<a href="{{patch.edit_url}}{% if dirname != '.' %}?path={{dirname}}{% endif %}">&lt; {{patch.id}}</a>
+			{% if parentfilename %}
+				|
+				<a href="{{patch.edit_url}}/editor?file={{parentfilename}}">
+					&lt;
+					{{parentfilename}}
+				</a>
+			{% endif %}
 			{% if not readonly %}
 			| <a href="#" onclick="return do_rename()">Rename File</a>
 			{% endif %}
