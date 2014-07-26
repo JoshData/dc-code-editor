@@ -555,10 +555,21 @@ Patch.prototype.getPathContent = function(path, with_base_content, callback) {
 	}
 }
 
+exports.isValidPath = function(filename) {
+	// Check the path/file name is valid. Check each directory/base name in the path,
+	// since slashes have to be excluded from the check.
+	var path_parts = filename.split("/");
+	for (var i = 0; i < path_parts.length; i++)
+		if (exports.disallowed_filename_chars.test(path_parts[i]))
+			return false;
+	return true;
+}
+
 Patch.prototype.writePathContent = function(path, new_content, override_checks) {
 	/* Writes to disk the new content for a path modified
 	   by this patch. */
 
+	if (!exports.isValidPath(path)) throw "invalid path";
 	if (!override_checks && (this.type == "root" || this.children.length > 0)) throw "Cannot modify the content of a root patch or a patch that has children!"
 
 	var needs_save = false;

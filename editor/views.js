@@ -269,17 +269,13 @@ exports.set_routes = function(app) {
 
 		res.setHeader('Content-Type', 'application/json');
 
-		// Check the file name is valid. Check each directory/base name in the path,
-		// since slashes have to be excluded from the check.
-		var path_parts = filename.split("/");
-		for (var i = 0; i < path_parts.length; i++) {
-			if (patches.disallowed_filename_chars.test(path_parts[i])) {
-				res.send(JSON.stringify({
-					"status": "error",
-					"msg": "A file name may only contain letters, numbers, dashes, underscores, periods, and tildes."
-				}));
-				return;
-			}
+		// Check the file name is valid.
+		if (!patches.isValidPath(filename)) {
+			res.send(JSON.stringify({
+				"status": "error",
+				"msg": "A file name may only contain letters, numbers, dashes, underscores, periods, and tildes."
+			}));
+			return;
 		}
 
 		res.send(JSON.stringify({
@@ -363,6 +359,58 @@ exports.set_routes = function(app) {
 			});
 
 	});
+
+	// Rename a File
+	app.post('/rename-patch-file', function(req, res){
+		var patch = patches.Patch.load(req.body.patch);
+		var path = req.body.path;
+		var newpath = req.body.newpath;
+
+		res.setHeader('Content-Type', 'application/json');
+
+		// Check the new file name is valid.
+		if (!patches.isValidPath(newpath)) {
+			res.send(JSON.stringify({
+				"status": "error",
+				"msg": "A file name may only contain letters, numbers, dashes, underscores, periods, and tildes."
+			}));
+			return;
+		}
+
+		// Check that nothing exists at the path the file is being renamed to.
+		patch.pathExists(newpath, false, function(exists) {
+			if (exists) {
+				res.send(JSON.stringify({
+					"status": "error",
+					"msg": "A file already exists with that name."
+				}));
+			} else {
+
+				// Get the content of the file being renamed.
+				patch.getPathContent(path, false, function(dummy, content) {
+					// If there is no content at the old path, no file exists there.
+					if (content == "") {
+						res.send(JSON.stringify({
+							"status": "error",
+							"msg": "No file exists at " + path + "."
+						}));
+					}
+
+					// Write it to the new path (synchronously).
+					patch.writePathContent(newpath, content);
+
+					// Clear the old path (synchronously).
+					patch.writePathContent(path, '');
+
+					res.send(JSON.stringify({
+						"status": "ok",
+						"redirect": patch.edit_url + "/editor?file=" + newpath
+					}));
+				});
+			}
+		});
+
+	});	
 
 	// Merge a Patch with its Parent
 	app.post('/patch/:patch/_merge_up', function(req, res){

@@ -16,6 +16,9 @@
 	<div class="row">
 		<div class="col-xs-6">
 			<a href="{{patch.edit_url}}{% if dirname != '.' %}?path={{dirname}}{% endif %}">&lt; {{patch.id}}</a>
+			{% if not readonly %}
+			| <a href="#" onclick="return do_rename()">Rename File</a>
+			{% endif %}
 		</div>
 		<div class="col-xs-6" style="text-align: right">
 			Edit In:
@@ -393,6 +396,26 @@
 
 	function no_linking() {
 		show_modal_error('Internal Link', 'Internal citation links are not supported in the code editor.');
+	}
+
+	function do_rename() {
+		var path = "{{filename}}";
+		value = prompt("Rename this file?", path);
+		if (!value || value == path) return;
+
+		ajax_call(
+			"/rename-patch-file",
+			{
+  				patch: "{{patch.id}}",
+  				path: path,
+  				newpath: value
+  			},
+  			function(res) {
+				window.location = res.redirect;
+  			},
+  			"Rename File");		
+
+		return false; // cancel link
 	}
 
 	</script>
