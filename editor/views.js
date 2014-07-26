@@ -361,7 +361,7 @@ exports.set_routes = function(app) {
 
 	});
 
-	// Rename a File
+	// Rename a File, smartly.
 	app.post('/rename-patch-file', function(req, res){
 		var patch = patches.Patch.load(req.body.patch);
 		var path = req.body.path;
@@ -403,10 +403,77 @@ exports.set_routes = function(app) {
 					// Clear the old path (synchronously).
 					patch.writePathContent(path, '');
 
-					res.send(JSON.stringify({
-						"status": "ok",
-						"redirect": patch.edit_url + "/editor?file=" + newpath
-					}));
+					// Be smart. Every file (except the root) is x:included
+					// from another file. Update the x:includes.
+					function update_xinclude_in_parent(path, create, callback) {
+						// Where would this file be x:included from?
+						var parentfile = get_parent_path(path);
+
+						// Get the raw content of the parent file.
+						patch.getPathContent(parentfile, false, function(dummy, content) {
+							if (content == "") {
+								// Parent does not exist. Nothing to modify.
+								console.log("parent has no content", parentfile);
+								callback();
+								return;
+							}
+
+							// Parse the XML.
+							var et = require('elementtree');
+							var dom;
+							try {
+								dom = et.parse(content);
+							} catch (e) {
+								// Parsing failed. Nothing to modify.
+								console.log("parent has invalid XML", parentfile, e);
+								callback();
+								return;
+							}
+
+							// Find the x:include for this path. elementtree does not provide
+							// a good .parent() function so we'll iterate ourselves.
+							var relpath = pathlib.relative(pathlib.dirname(parentfile), path);
+							var found = false;
+							function findxi(node, parent) {
+								if (node.tag == "ns0:include" && node.get("href") == relpath) {
+									found = true;
+									if (!create) {
+										// Delete.
+										parent.remove(node)
+									}
+								} else {
+									for (var i = 0; i < node.getchildren().length; i++)
+										findxi(node.getchildren()[i], node)
+								}
+
+							}
+							findxi(dom._root, null);
+							if (!found && create) {
+								// If an x:include didn't exist, then add one to the end of
+								// the document.
+								xi = et.SubElement(dom._root, "ns0:include");
+								xi.set("href", relpath);
+								xi.set("xmlns:ns0", "http://www.w3.org/2001/XInclude");
+							}
+
+							// Serialize & save.
+							dom = dom.write({'xml_declaration': false, 'indent': 2});
+							patch.writePathContent(parentfile, dom);
+							callback();
+						});
+					}
+
+					// Update the parent of the old path.
+					update_xinclude_in_parent(path, false, function() {
+						// Update the parent of the new path.
+						update_xinclude_in_parent(newpath, true, function() {
+							// Done.
+							res.send(JSON.stringify({
+								"status": "ok",
+								"redirect": patch.edit_url + "/editor?file=" + newpath
+							}));
+						})
+					})
 				});
 			}
 		});
@@ -544,3 +611,4 @@ function get_macros(macro_type) {
 	});
 	return ret;
 }
+
