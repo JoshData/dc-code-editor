@@ -582,7 +582,7 @@ Patch.prototype.writePathContent = function(path, new_content, override_checks) 
 		// Save the content with the "raw" method, which means we dump the
 		// contents of the file into a file.
 
-		if (!(path in this.files)) {
+		if (!(path in this.files) || this.files[path].method != "raw") {
 			// How should we store the changes on disk?
 			this.files[path] = {
 				storage: path.replace(/\//g, "_"),
