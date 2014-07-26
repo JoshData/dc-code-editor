@@ -89,8 +89,16 @@
 		text-decoration: line-through;
 	}
 
+	.pane-title {
+		margin-top: 10px;
+		padding: 4px;
+		border-bottom: 1px solid #CCC;
+		text-transform: uppercase;
+		color: #777;
+	}
+
 	#editor_preview {
-		background-color: #FAFAFA;
+		background-color: #f7f7f7; /* matches CodeMirror gutter */
 	}
 
  

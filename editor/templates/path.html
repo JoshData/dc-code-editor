@@ -36,7 +36,7 @@
 			[<a href="{{patch.edit_url}}/_new?file={{filename}}">Start New Patch</a>]
 		</div>
 	</div>
-	<h1 style="margin: 0">{{filename}}</h1>
+	<h1 style="margin: 10px 0 0 0; font-size: 20px; font-weight: bold;">{{filename}}</h1>
 
 	{% if readonly %}<p style="margin-top: 1em" class="text-warning">This patch is read-only.</p>{% endif %}
 
@@ -44,18 +44,18 @@
 		<div class="col-sm-6">
 			<div id="save_status">&nbsp;</div>
 			{% if !readonly %}
-				<h2>Edit File</h2>
+				<div class="pane-title">Editor</div>
 			{% else %}
-				<h2>View File</h2>
+				<div class="pane-title">File Content (Read-Only)</div>
 			{% endif %}
 
-			<div class="vertical-scoll-pane">
+			<div class="vertical-scoll-pane" style="width: 100%;">
 				<textarea id="editor_textarea" style="display: none">{{current_text}}</textarea>
 			</div>
 		</div>
 
 		<div class="col-sm-6">
-			<h2>Preview</h2>
+			<div class="pane-title">Preview</div>
 			<div id="editor_preview" class='vertical-scoll-pane'>
 				<div id="content">
 					&nbsp;
