@@ -49,13 +49,17 @@
 				<h2>View File</h2>
 			{% endif %}
 
-			<textarea id="editor_textarea" style="display: none">{{current_text}}</textarea>
+			<div class="vertical-scoll-pane">
+				<textarea id="editor_textarea" style="display: none">{{current_text}}</textarea>
+			</div>
 		</div>
 
 		<div class="col-sm-6">
 			<h2>Preview</h2>
-			<div id="editor_preview">
+			<div id="editor_preview" class='vertical-scoll-pane'>
 				<div id="content">
+					&nbsp;
+				</div>
 			</div>
 		</div>
 	</div>
@@ -71,6 +75,16 @@
 	var base_text = {{base_text|safe}};
 	var dmp = new diff_match_patch();
 	dmp.Diff_Timeout = .075; // otherwise the computation can be slow and interfere with the UI
+
+	$(window).resize(window_resize);
+	window_resize();
+	function window_resize() {
+		$('.vertical-scoll-pane').each(function() {
+			var height = $(window).height();
+			var top = $(this).offset().top;
+			$(this).height(height-top).css({ overflow: "auto" });
+		});
+	}
 
 	var editor = CodeMirror.fromTextArea($("#editor_textarea")[0], {
 		mode: "text/xml",
