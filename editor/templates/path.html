@@ -41,7 +41,7 @@
 	{% if readonly %}<p style="margin-top: 1em" class="text-warning">This patch is read-only.</p>{% endif %}
 
 	<div class="row">
-		<div class="col-sm-6">
+		<div class="col-sm-6" style="padding-left: 0">
 			<div id="save_status">&nbsp;</div>
 			{% if !readonly %}
 				<div class="pane-title">Editor</div>
@@ -63,6 +63,12 @@
 			</div>
 		</div>
 	</div>
+
+	<div class="row">
+		<div id="editor-help">
+			<span class="action">§</span> <span class="shortcut">Ctrl+S</span>
+		</div>
+	</div>
 {% endblock %}
 
 {% block scripts %}
@@ -80,9 +86,9 @@
 	window_resize();
 	function window_resize() {
 		$('.vertical-scoll-pane').each(function() {
-			var height = $(window).height();
+			var height = $(window).height() - $("#editor-help").outerHeight();
 			var top = $(this).offset().top;
-			$(this).height(height-top).css({ overflow: "auto" });
+			$(this).height(height-top-2).css({ overflow: "auto" });
 		});
 	}
 
@@ -95,6 +101,12 @@
 		indentWithTabs: true,
 		tabSize: 6,
 		smartIndent: false,
+		extraKeys: {
+			'Ctrl-S': function(cm) {
+			    cm.replaceSelection("§");
+			    cm.setCursor(cm.getCursor())
+			  }
+		},
 		autoCloseTags: true
 	});
 	editor.setSize("100%", "100%");

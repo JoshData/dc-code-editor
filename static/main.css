@@ -92,7 +92,7 @@
 
 	.pane-title {
 		margin-top: 10px;
-		padding: 4px;
+		padding: 4px 4px 4px 15px;
 		border-bottom: 1px solid #CCC;
 		text-transform: uppercase;
 		color: #777;
@@ -102,6 +102,19 @@
 		background-color: #f7f7f7; /* matches CodeMirror gutter */
 	}
 
+	#editor-help {
+		background-color: #EEE;
+		border-top: 1px solid #DDD;
+		padding: 3px 5px 4px 5px;
+		text-align: right;
+	}
+		#editor-help .action {
+			font-weight: bold;
+			margin-right: .25em;
+		}
+		#editor-help .shortcut {
+			font-family: monospace;
+		}
  
  #macros {
  	margin: 0;
