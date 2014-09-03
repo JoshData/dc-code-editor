@@ -1,1 +1,1 @@
-../ext/bootstrap/js/tests/vendor/jquery.js
+../ext/bootstrap/js/tests/vendor/jquery.min.js
