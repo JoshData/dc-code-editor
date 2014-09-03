@@ -129,6 +129,8 @@ exports.getTree = function(callback) {
 				modify_with_new_patch: (patch.type != "root") && (patch.children.length > 0),
 				can_merge_up: base_patch != null && base_patch.type == "patch",
 
+				draft: patch.draft,
+
 				effective_date_stamp: patch.effective_date ? moment(patch.effective_date).unix() : '0',
 				effective_date_display: patch.effective_date ? moment(patch.effective_date).format("MMMM D, YYYY") : "(Not Set)"
 			};
@@ -185,7 +187,8 @@ function new_patch_internal(patch) {
 	patch.files = { }; // the actual changes w/in this patch
 	patch.children = [ ]; // UUIDs of children whose base patch is this patch
 	patch.notes = patch.notes || "";
-	patch.effective_date = patch.effective_date || null;
+	patch.effective_date = null;
+	patch.draft = true;
 	patch.save();
 	return Patch.load(patch.id);
 }

@@ -106,6 +106,7 @@ exports.set_routes = function(app) {
 	// Rename/Delete/Modify Patch
 	app.post('/patch/:patch/_action', function(req, res){
 		var patch = patches.Patch.load(req.params.patch);
+		var response = { "status": "ok" };
 
 		if (req.body.action == "rename") {
 			var new_id = req.body.value;
@@ -123,6 +124,7 @@ exports.set_routes = function(app) {
 					}));
 				}
 			});
+			return;
 		}
 
 		if (req.body.action == "delete") {
@@ -147,25 +149,23 @@ exports.set_routes = function(app) {
 					}));
 				}
 			}, req.body.force);
+			return;
 		}
 
 		if (req.body.action == "notes") {
 			patch.notes = req.body.value;
 			patch.save();
-			res.setHeader('Content-Type', 'application/json');
-			res.send(JSON.stringify({
-				"status": "ok",
-				"markdown": render_patch_notes(patch)
-			}));
+			response["markdown"] = render_patch_notes(patch);
 		}
 
 		if (req.body.action == "effdate") {
 			patch.effective_date = req.body.value;
 			patch.save();
-			res.setHeader('Content-Type', 'application/json');
-			res.send(JSON.stringify({
-				"status": "ok"
-			}));
+		}
+
+		if (req.body.action == "draft") {
+			patch.draft = (req.body.value == 'true');
+			patch.save();
 		}
 
 		if (req.body.action == "move") {
@@ -186,7 +186,11 @@ exports.set_routes = function(app) {
 					}));
 				}
 			});
+			return;
 		}
+
+		res.setHeader('Content-Type', 'application/json');
+		res.send(JSON.stringify(response));
 	});
 
 	function render_patch_notes(patch) {

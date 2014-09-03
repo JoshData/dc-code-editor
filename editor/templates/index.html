@@ -43,6 +43,9 @@
 					</div>
 					<div class="timeline-patch-metadata">
 						{% if patch.type == "patch" %}
+							{% if patch.draft %}
+								<div class="draft">draft</div>
+							{% endif %}
 							<div class="effective-date" data-effective-date="{{patch.effective_date_stamp}}"><em>Effective Date:</em> <span>{{patch.effective_date_display}}</span></div>
 						{% endif %}
 					</div>

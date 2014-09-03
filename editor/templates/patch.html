@@ -12,19 +12,31 @@
 	</p>
 	<h1 style="margin-top: 0">{{patch.id}}</h1>
 
+	{% if patch.type == "patch" %}
 	<div class="row" style="padding: 1.5em 0;">
 		<div class="col-sm-3">
-			<label for="patchEffectiveDate">Effective Date:</label>
-			{% if patch.type == "patch" %}
-		  	<div class="input-group date" style="width: 12em">
-		  		<input id="patchEffectiveDate" type="text" class="form-control" readonly="1"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
-		  	</div>
-		  	{% else %}
-		  	<br><em>Not applicable for a root patch.</em>
-		  	{% endif %}
-	  	</div>
-	  	<div class="col-sm-9">
-		    <label for="notesTextarea">Patch Description:</label>
+			<div class="form-group">
+				<div><b>Status:</b></div>
+				<div class="checkbox">
+				  <label>
+				    <input id="patchStatusDraft" type="checkbox" value="" {% if patch.draft %}checked{% endif %}>
+				    Draft (do not publish)
+				  </label>
+				</div>
+			</div>
+		</div>
+
+		<div class="col-sm-3">
+			<div class="form-group">
+				<label for="patchEffectiveDate">Effective Date:</label>
+			  	<div class="input-group date" style="width: 12em">
+			  		<input id="patchEffectiveDate" type="text" class="form-control" readonly="1"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+			  	</div>
+			  </div>
+  		</div>
+
+		<div class="col-sm-12">
+		    <label for="notesTextarea">Notes:</label>
 			<div id="notes">
 				{{notes|safe}}
 			</div>
@@ -36,8 +48,9 @@
 				  <button type="submit" class="btn btn-default">Save</button>
 				</form>				
 			</div>
-	  	</div>
-	</div>
+	  	</div>	  		
+  	</div>
+  	{% endif %}
 
 	{% include "macros.html" %}
 
@@ -167,9 +180,18 @@
 				function(res) { },
 				"Effective Date");
 			return false;
-
 		});
 
+		$('#patchStatusDraft').change(function() {
+			ajax_call(
+				"{{patch.edit_url}}/_action",
+				{
+	  				action: "draft",
+	  				value: $(this).prop('checked')
+	  			},
+				function(res) { },
+				"Draft");
+		})
 	});
 
 	function patch_action(action) {
