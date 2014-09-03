@@ -189,6 +189,7 @@ function new_patch_internal(patch) {
 	patch.notes = patch.notes || "";
 	patch.effective_date = null;
 	patch.draft = true;
+	patch.metadata = { };
 	patch.save();
 	return Patch.load(patch.id);
 }

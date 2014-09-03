@@ -168,6 +168,11 @@ exports.set_routes = function(app) {
 			patch.save();
 		}
 
+		if (req.body.action == "metadata") {
+			patch.metadata[req.body.key] = req.body.value;
+			patch.save();
+		}
+
 		if (req.body.action == "move") {
 			// Move a patch to be the child of another patch.
 			var new_base_patch = patches.Patch.load(req.body.new_base);
@@ -196,7 +201,7 @@ exports.set_routes = function(app) {
 	function render_patch_notes(patch) {
 		var markdown = require( "markdown" ).markdown;
 		var notes = patch.notes;
-		if (!/\S/.test(notes)) notes = "*no description*";
+		if (!/\S/.test(notes)) notes = "*no notes*";
 		return markdown.toHTML(notes + " EDITLINKSENTINEL").replace("EDITLINKSENTINEL", " [<a href='#' onclick='return edit_patch_notes();'>edit</a>]");
 	}
 

@@ -14,7 +14,7 @@
 
 	{% if patch.type == "patch" %}
 	<div class="row" style="padding: 1.5em 0;">
-		<div class="col-sm-3">
+		<div class="col-sm-3 col-lg-2">
 			<div class="form-group">
 				<div><b>Status:</b></div>
 				<div class="checkbox">
@@ -26,17 +26,28 @@
 			</div>
 		</div>
 
-		<div class="col-sm-3">
+		<div class="col-sm-3 col-lg-2">
 			<div class="form-group">
 				<label for="patchEffectiveDate">Effective Date:</label>
-			  	<div class="input-group date" style="width: 12em">
-			  		<input id="patchEffectiveDate" type="text" class="form-control" readonly="1" style="background-color: white; cursor: pointer;"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+			  	<div class="input-group date">
+			  		<input id="patchEffectiveDate" type="text" class="form-control" readonly="1" style="background-color: white; cursor: pointer;">
+			  		<span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
 			  	</div>
 			  </div>
   		</div>
 
-		<div class="col-sm-12">
-		    <label for="notesTextarea">Notes:</label>
+		<div class="col-sm-3 col-lg-2">
+			<div class="form-group">
+				<label for="patchActNumber">Act Number:</label>
+			  	<div class="input-group">
+			  		<input id="patchActNumber" type="text" class="form-control" value="{{patch.metadata.actNumber}}">
+			  		<span id="patchActNumberConfirm" class="input-group-addon" style="cursor: pointer"><i class="glyphicon glyphicon-ok"></i></span>
+			  	</div>
+			  </div>
+  		</div>
+
+		<div class="col-sm-12 col-lg-6">
+		    <label for="notesTextarea">Notes: <span style="font-weight: normal; font-size: 90%; font-style: italic; color: #666;">(will be public when published)</span></label>
 			<div id="notes">
 				{{notes|safe}}
 			</div>
@@ -190,7 +201,30 @@
 	  				value: $(this).prop('checked')
 	  			},
 				function(res) { },
-				"Draft");
+				"Set Draft Status");
+		})
+
+		$("#patchActNumberConfirm").css({ color: '#AAA' })
+		$('#patchActNumber').keypress(function() {
+			$("#patchActNumberConfirm").css({ color: 'black' })
+		});
+		$('#patchActNumber').change(function() {
+			var value = $('#patchActNumber').val();
+
+			if (value != "" && !/^[1-9]\d*-[1-9]\d*$/.exec(value)) {
+				show_modal_error("Act Number", "An act number looks like 20-100.");
+				return;
+			}
+
+			ajax_call(
+				"{{patch.edit_url}}/_action",
+				{
+	  				action: "metadata",
+	  				key: "actNumber",
+	  				value: value
+	  			},
+				function(res) { $("#patchActNumberConfirm").css({ color: '#AAA' }) },
+				"Set Act Number");
 		})
 	});
 
@@ -254,7 +288,6 @@
   				value: $('#notesTextarea').val()
   			},
 			function(res) {
-				console.log(res);
 				$('#notes').show();
 				$('#notes-edit').hide();
 				$('#notes').html(res.markdown);
