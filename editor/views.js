@@ -8,6 +8,14 @@ var settings = require("./settings.js");
 
 String.prototype.repeat = function( num ) { return new Array( num + 1 ).join( this ); }
 
+exports.getUser = function(username) {
+	for (var i = 0; i < settings.authorized_users.length; i++) {
+		if (username == settings.authorized_users[i].username)
+			return settings.authorized_users[i];
+	}
+	return null;
+}
+
 exports.set_routes = function(app) {
 	// Home Screen
 	var home_template = swig.compileFile(__dirname + '/templates/index.html');
@@ -514,8 +522,8 @@ exports.set_routes = function(app) {
 		repo.commit(
 			settings.workspace_directory,
 			"committing workspace",
-			settings.committer_name,
-			settings.committer_email,
+			exports.getUser(req.user).committer_name,
+			exports.getUser(req.user).committer_email,
 			null, // commit date = current date
 			false, // sign
 			function(output) {

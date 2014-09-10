@@ -5,13 +5,15 @@ exports.workspace_directory = __dirname + "/../workspace";
 exports.code_directory = __dirname + "/../base_code";
 exports.code_branch = 'gh-pages';
 
-exports.committer_name = "Council of the District of Columbia";
-exports.committer_email = "official-dc-code@dccouncil.us"
+exports.public_committer_name = "Council of the District of Columbia";
+exports.public_committer_email = "official-dc-code@dccouncil.us"
 
 exports.authorized_users = [
 	{
 		username: "test",
-		password: "pw"
+		password: "pw",
+		committer_name: "Test User",
+		committer_email: "test@dccouncil.us",
 	}
 ];
 

@@ -9,6 +9,7 @@ function start_server() {
 
 	var settings = require("./settings.js");
 	var express = require('express');
+	var views = require('./views.js');
 
 	var app = express();
 
@@ -19,12 +20,8 @@ function start_server() {
 
 	// authorization
 	app.use(express.basicAuth(function(user, pass) {
-		for (var i = 0; i < settings.authorized_users.length; i++) {
-			var auth_user = settings.authorized_users[i];
-			if (user == auth_user.username && pass == auth_user.password)
-				return true;
-		}
-		return false;
+		var auth_user = views.getUser(user);
+		return auth_user && (pass == auth_user.password);
 	}));
 
 	// CSRF protection
@@ -33,7 +30,6 @@ function start_server() {
 	app.use(express.csrf());
 
 	// configure routes
-	var views = require('./views.js');
 	views.set_routes(app);
 
 	// error conditions

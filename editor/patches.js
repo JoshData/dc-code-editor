@@ -941,8 +941,8 @@ exports.export_code = function(callback) {
 							tag_name,
 							"official code export",
 							false,
-							settings.committer_name,
-							settings.committer_email,
+							settings.public_committer_name,
+							settings.public_committer_email,
 							callback);
 					});
 				}
@@ -993,8 +993,8 @@ Patch.prototype.commit = function(changed_paths, message, callback) {
 				repo.commit(
 					settings.code_directory,
 					message || patch.id + "\n\n" + patch.notes,
-					settings.committer_name,
-					settings.committer_email,
+					settings.public_committer_name,
+					settings.public_committer_email,
 					new Date(patch.effective_date).toISOString(),
 					false, // don't sign because it will change the hash
 					function(commit_output) {
