@@ -7,6 +7,7 @@ check_can_start(function() {
 function start_server() {
 	var port = 8000;
 
+	var settings = require("./settings.js");
 	var express = require('express');
 
 	var app = express();
@@ -15,6 +16,16 @@ function start_server() {
 	app.set('title', 'Legal Code Editor');
 	app.use(express.bodyParser());
 	app.use("/static", express.static('static'))
+
+	// authorization
+	app.use(express.basicAuth(function(user, pass) {
+		for (var i = 0; i < settings.authorized_users.length; i++) {
+			var auth_user = settings.authorized_users[i];
+			if (user == auth_user.username && pass == auth_user.password)
+				return true;
+		}
+		return false;
+	}));
 
 	// configure routes
 	var views = require('./views.js');
