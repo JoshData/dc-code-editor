@@ -28,12 +28,11 @@
 			{% endif %}
 		</div>
 		<div class="col-xs-6" style="text-align: right">
-			Edit In:
-			{% if base_patch %}<a href="{{base_patch.edit_url}}/editor?file={{filename}}">{{base_patch.id}}</a> | {% endif %}
+			See This File In:
+			{% if base_patch %}<a href="{{base_patch.edit_url}}/editor?file={{filename}}">{{base_patch.id}}</a>{% endif %}
 			{% for child in child_patches %}
-				<a href="{{child.edit_url}}/editor?file={{filename}}">{{child.id}}</a> |
+				<a href="{{child.edit_url}}/editor?file={{filename}}">{{child.id}}</a>
 			{% endfor %}
-			[<a href="{{patch.edit_url}}/_new?file={{filename}}">Start New Patch</a>]
 		</div>
 	</div>
 	<h1 style="margin: 10px 0 0 0; font-size: 20px; font-weight: bold;">{{filename}}</h1>

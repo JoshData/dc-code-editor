@@ -27,6 +27,11 @@ function start_server() {
 		return false;
 	}));
 
+	// CSRF protection
+	app.use(express.cookieParser());
+	app.use(express.session({ secret: settings.site_secret_key }));
+	app.use(express.csrf());
+
 	// configure routes
 	var views = require('./views.js');
 	views.set_routes(app);

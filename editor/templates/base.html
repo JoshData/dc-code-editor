@@ -59,7 +59,15 @@
         </div>
 
         <script src="/static/jquery.js"></script>
-        <script>$(document).ajaxSend(function(event, xhr, settings) { if (!/^https?:.*/.test(settings.url)) xhr.setRequestHeader("X-CSRFToken", "{{csrf_token}}"); });</script>
+        <script>$.ajaxPrefilter(function( options ) {
+          // On local AJAX requests, add the CSRF token to the end of the request body,
+          // which has already been URL-encoded.
+          if (options.url.substring(0, 1) != "/") return;
+          if (options.data != "")
+            options.data += "&";
+          options.data += "_csrf=" + encodeURIComponent("{{csrf_token}}");
+        });
+        </script>
         <script src="/static/jquery-ui.min.js"></script> <!-- //ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js -->
 
         <script src="/static/bootstrap/js/bootstrap.min.js"></script>

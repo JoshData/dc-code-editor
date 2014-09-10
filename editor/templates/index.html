@@ -16,7 +16,8 @@
 		<div class="timeline-row">
 			<div class="timeline-patch" style="padding-bottom: 30px">
 
-				<form class="form-inline" role="form" action="{{head_patch.edit_url}}/_new" onclick="return validate_new_patch_name();">
+				<form class="form-inline" role="form" action="{{head_patch.edit_url}}/_new" onclick="return validate_new_patch_name();" method="post">
+				  <input type="hidden" name="_csrf" value="{{csrf_token}}">
 				  <div class="form-group">
 				    <input name="name" type="text" class="form-control" id="new-patch-name" placeholder="L20-0108" onkeyup="update_new_patch_disabled()" onchange="update_new_patch_disabled()">
 				  </div>

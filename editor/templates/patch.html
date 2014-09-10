@@ -92,6 +92,17 @@
 		{% endif %}
 
 		<div class="col-sm-6">
+			{% if readonly and patch.type != "root" %}
+				<h2>Revise Patch</h2>
+
+				<p>The changes in this patch cannot be revised directly now that there are other subsequent patches in the code history. To modify this patch, first start a draft revision and then merge the draft when the revision is complete.</p>
+
+				<form class="form-inline" role="form" action="{{patch.edit_url}}/_new" method="post" style="margin: 1em 0 2em 1em">
+					<input type="hidden" name="_csrf" value="{{csrf_token}}">
+					<button type="submit" class="btn btn-default">Begin Revision to {{patch.id}}</button>
+				</form>
+			{% endif %}
+
 			{% if !readonly %}
 				<h2>Edit File...</h2>
 			{% else %}
@@ -109,12 +120,9 @@
 				<div class="tab-pane active" id="file-list">
 					{% if !readonly %}
 						<p>Choose a file below to modify it:</p>
-					{% else %}
-						{% if patch.type == "root" %}
-							<p>The files cannot be modified in a root patch.</p>
-						{% else %}
-							<p>The files cannot be modified in this patch because there are other patches that continue from it. To modify this patch, first start a <a href="{{patch.edit_url}}/_new">revision patch</a> and then merge the patches.</p>
-						{% endif %}
+					{% endif %}
+					{% if readonly and patch.type == "root" %}
+						<p>The files cannot be modified in a root patch.</p>
 					{% endif %}
 
 					<ul style="list-style: none; padding: 0;">
@@ -150,12 +158,6 @@
 
 		</div>
 	</div>
-
-	<!--
-	<h2>New Patch</h2>
-	<p>Start a <a href="{{patch.edit_url}}/_new">new patch</a> based on the text of the Code as it appears in this patch?</p>
-	-->
-
 {% endblock %}
 
 {% block scripts %}

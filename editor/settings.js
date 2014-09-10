@@ -1,3 +1,5 @@
+exports.site_secret_key = "changeme";
+
 exports.workspace_directory = __dirname + "/../workspace";
 
 exports.code_directory = __dirname + "/../base_code";

@@ -24,6 +24,8 @@ exports.set_routes = function(app) {
 			},
 			function(err, results) {
 				res.send(home_template({
+					csrf_token: req.csrfToken(), // passed to every template
+
 					patch_tree: results.patch_tree,
 					head_patch: results.patch_tree[0][0],
 					workspace_is_dirty: results.workspace_is_dirty
@@ -68,6 +70,8 @@ exports.set_routes = function(app) {
 				path_up = pathlib.dirname(req.query.path);
 
 			res.send(show_patch_template({
+				csrf_token: req.csrfToken(), // passed to every template
+
 				patch: patch,
 				readonly: (patch.type == "root") || (patch.children.length > 0),
 
@@ -86,19 +90,19 @@ exports.set_routes = function(app) {
 	});
 
 	// New Patch
-	app.get('/patch/:patch/_new', function(req, res){
+	app.post('/patch/:patch/_new', function(req, res){
 		var patch = patches.Patch.load(req.params.patch);
 		patch = patch.createChild();
 
 		function do_redirect(err, patch) {
-			if (!req.query.file)
+			if (!req.body.file)
 				res.redirect(patch.edit_url);
 			else
-				res.redirect(patch.edit_url + "/editor?file=" + req.query.file);
+				res.redirect(patch.edit_url + "/editor?file=" + req.body.file);
 		}
 
-		if (req.query.name)
-			patch.rename(req.query.name, do_redirect)
+		if (req.body.name)
+			patch.rename(req.body.name, do_redirect)
 		else
 			do_redirect(null, patch);
 	});
@@ -238,6 +242,8 @@ exports.set_routes = function(app) {
 				resources.content.current_text = spaces_to_tabs(resources.content.current_text);
 
 				res.send(edit_path_template({
+					csrf_token: req.csrfToken(), // passed to every template
+
 					patch: patch,
 					readonly: !has_base_text || (patch.children.length > 0),
 					filename: filename,
