@@ -940,7 +940,7 @@ exports.export_code = function(callback) {
 							hash,
 							tag_name,
 							"official code export",
-							true,
+							false,
 							settings.committer_name,
 							settings.committer_email,
 							callback);

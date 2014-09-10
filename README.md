@@ -35,9 +35,6 @@ This repository has been tested with Ubuntu 13.10 and node v0.10.26.
 	# make a workspace directory
 	git init workspace
 
-	# create a signing key for your committer_name/committer_email in settings.js.
-	gpg2 --gen-key
-
 Run
 ---
 

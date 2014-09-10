@@ -511,7 +511,7 @@ exports.set_routes = function(app) {
 			settings.committer_name,
 			settings.committer_email,
 			null, // commit date = current date
-			true, // sign
+			false, // sign
 			function(output) {
 				res.setHeader('Content-Type', 'application/json');
 				res.send(JSON.stringify({
