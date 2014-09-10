@@ -903,6 +903,14 @@ exports.export_code = function(callback) {
 		// remove the root patch from the history since we never commit it
 		var root_patch = patch_history.shift();
 
+		// stop at the first draft
+		for (var i = 0; i < patch_history.length; i++) {
+			if (patch_history[i].draft) {
+				patch_history = patch_history.slice(0, i);
+				break;
+			}
+		}
+
 		if (patch_history.length == 0) {
 			callback("There is nothing to export.");
 			return;
@@ -958,6 +966,7 @@ Patch.prototype.commit = function(changed_paths, message, callback) {
 	// and calls callback with (err, hash, commit_output).
 	var patch = this;
 	if (!patch.effective_date) { callback("Patch " + patch.id + " does not have an effective date set."); return; }
+	if (patch.draft) { callback("Patch " + patch.id + " is marked as a draft."); return; }
 
 	function write_working_tree_path(path, content, callback) {
 		// Writes the content to the working tree path. 
