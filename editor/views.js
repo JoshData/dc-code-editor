@@ -536,13 +536,12 @@ exports.set_routes = function(app) {
 	});
 
 	// Export The Code!
-	app.post('/_export_code', function(req, res){
-		patches.export_code(function(err, results) {
+	app.post('/_export', function(req, res){
+		patches.export_to_audit_log(function(err) {
 			res.setHeader('Content-Type', 'application/json');
 			res.send(JSON.stringify({
 				"status": (!err ? "ok" : "error"),
-				"msg": ""+err,
-				"git_output": results ? results.join("\n") : null
+				"msg": ""+err
 			}));
 		});
 	});

@@ -6,7 +6,7 @@
 <div class="container">
 	<div style="float: right; text-align: right">
 		<a id="commit_workspace" href="#" onclick="return do_commit_workspace()" class="btn btn-warning {% if not workspace_is_dirty %}disabled{% endif %}">Commit Workspace</a>
-		<a href="#" onclick="return do_export_code()" class="btn btn-warning">Export the Code</a>
+		<a href="#" onclick="return do_export_code()" class="btn btn-warning">Export to Audit Log</a>
 	</div>
 
 	<h1>Timeline</h1>
@@ -179,18 +179,17 @@ function do_commit_workspace() {
 
 function do_export_code() {
 	show_modal_confirm(
-		"Export Code",
-		"Are you ready to export the code? Each patch will be turned into a commit in your local code repository.",
+		"Export Code to Audit Log",
+		"This will update the local audit log repository with the contents of all of the non-draft patches.",
 		"Export",
 		function() {
 			// user says go for it
 			ajax_call(
-				"/_export_code",
+				"/_export",
 				{
 				},
 				function(res) {
 					show_modal_error("Export Code", "The export is complete.");
-					console.log(res.git_output);
 				},
 				"Export Code"
 			);

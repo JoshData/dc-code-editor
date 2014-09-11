@@ -4,6 +4,8 @@ var pathlib = require("path");
 var clone = require('clone');
 var uuid = require('node-uuid');
 var async = require('async');
+var temp = require("temp").track();
+var mkdirp = require('mkdirp');
 
 var repo = require("./repository.js");
 var settings = require("./settings.js");
@@ -876,16 +878,53 @@ Patch.prototype.getDiff = function(callback) {
 	);
 }
 
-exports.export_code = function(callback) {
-	// Creates a new branch in the code repository dated today and commits
-	// each patch from the beginning onto it. If early patches haven't changed,
-	// git is smart enough not to create new commit objects. The common
-	// history of branches will be the same commits.
-	//
-	// Calls callback(err, [gitoutputs]).
+exports.export_to_audit_log = function(callback) {
+	// Exports the public patch data to the audit log repository where it
+	// will get reviewed prior to publication.
 
-	// Get the code history of this patch.
-	exports.getTree(function(patch_history) {
+	var diff = require("diff");
+	var moment = require('moment');
+	var yaml = require('js-yaml');
+
+	prepare_audit_scratch_dir(function(dirPath, last_step) {
+		exports.getTree(function(patch_history) {
+			write_patches(dirPath, patch_history, function(err) {
+				if (err) { last_step(err); return; }
+				do_commit(dirPath, last_step);
+			});
+		});
+	})
+
+	function prepare_audit_scratch_dir(next_step) {
+		// To ensure we commit exactly the right thing, we'll start off with
+		// an empty directory. If we were to use an existing directory we
+		// might accidentally commit existing files that are no longer
+		// wanted.
+		temp.mkdir('dc-code-editor-audit-scratch-', function(err, dirPath) {
+			// ...And symlink in the audit repository's .git directory.
+			// That might put the real audit repo directory into a weird
+			// state between the index and working copy.
+			fs.symlinkSync(
+				pathlib.join(settings.audit_repo_directory, ".git"),
+				pathlib.join(dirPath, ".git"))
+
+			next_step(
+				dirPath,
+				function(err) {
+					// Clear temporary directory when everything is finished.
+					temp.cleanupSync();
+
+					// Reset the real audit directory to have checked out
+					// the new head.
+					repo.clean_working_tree(settings.audit_repo_directory, function() {
+						// And return control to the caller.
+						callback(err);
+					})
+				})
+		});
+	}
+
+	function write_patches(dirPath, patch_history, callback) {
 		// We get the tree in reverse-chronological order with each record
 		// an array containing the main-line patch and any auxiliary children
 		// (like we display it). Also we get a dict with various pre-loaded
@@ -916,102 +955,90 @@ exports.export_code = function(callback) {
 			return;
 		}
 
-		// start from the base patch's commit
-		repo.checkout_detached_head(
-			settings.code_directory,
-			root_patch.hash,
-			function(err) {
+		fs.writeFileSync(pathlib.join(dirPath, "metadata.yaml"), yaml.safeDump({
+			"root": {
+				"id": root_patch.id,
+				"hash": root_patch.hash,
+			},
+			"patches": patch_history.map(function(patch) { return patch.id }),
+		}));
 
-			if (err) {
-				callback(err);
-				return;
-			}
+		// Mark the previous patch on each patch.
+		patch_history[0].base_patch_id = root_patch.id;
+		for (var i = 1; i < patch_history.length; i++)
+			patch_history[i].base_patch_id = patch_history[i-1].id;
 
-			// start committing!
-			async.mapSeries(
-				patch_history,
-				function(item, callback) {
-					item.commit(null, null, callback)
-				},
-				function(err, results) {
-					if (err) { callback(err); return; }
+		// Put the path info on the patch objects to simplify passing things
+		// around.
+		for (var i = 0; i < patch_history.length; i++)
+			patch_history[i].export_path = pathlib.join(dirPath, patch_history[i].id);
 
-					// Make a signed tag for the last commit. We don't sign
-					// the individual commits because each time we export the
-					// hashes will change. Rather, we want to take advantage of
-					// the hashes being stable (so long as the patch doesn't change)
-					// so that re-exporting over and over won't blow up the repository.
-					repo.get_repository_head(settings.code_directory, null, function(hash) {
-						var tag_name = "release_" + new Date().toISOString().replace(/[^0-9]/g, "");
-						repo.tag(
-							settings.code_directory,
-							hash,
-							tag_name,
-							"official code export",
-							false,
-							settings.public_committer_name,
-							settings.public_committer_email,
-							callback);
+		// Write all of the patches and call the callback when done.
+		async.map(patch_history, write_patch, callback);
+	}
+
+	function write_patch(patch, callback) {
+		// sanity checks
+		if (!patch.effective_date) { callback("Patch " + patch.id + " does not have an effective date set."); return; }
+		if (patch.draft) { callback("Patch " + patch.id + " is marked as a draft."); return; }
+
+		var fn = pathlib.join(patch.export_path, "metadata.json");
+		mkdirp(pathlib.dirname(fn), function(err) {
+			if (err) { callback(err); return; }
+
+			// write the patch's metadata
+			fs.writeFileSync(fn, yaml.safeDump({
+				"id": patch.uuid,
+				"previous": patch.base_patch_id,
+				"created": patch.created.toISOString(),
+				"effectiveDate": moment(patch.effective_date).toISOString(),
+				"actNumber": patch.metadata.actNumber || null,
+				"notes": patch.notes || null,
+			}));
+
+			// for each changed path in the patch, write a unified diff to a patch file
+			async.map(
+				Object.keys(patch.files),
+				function(changed_path, callback) {
+					patch.getPathContent(changed_path, true, function(base_content, current_content) {
+						write_path_diff(patch, changed_path, base_content, current_content, callback);
 					});
-				}
-			)
+				},
+				callback
+			);
 		});
+	}
 
-	});
-}
-
-Patch.prototype.commit = function(changed_paths, message, callback) {
-	// Reset the working tree (reset --hard), adds any modified
-	// or deleted files (add -A), commits the result (commit -m),
-	// and calls callback with (err, hash, commit_output).
-	var patch = this;
-	if (!patch.effective_date) { callback("Patch " + patch.id + " does not have an effective date set."); return; }
-	if (patch.draft) { callback("Patch " + patch.id + " is marked as a draft."); return; }
-
-	function write_working_tree_path(path, content, callback) {
+	function write_path_diff(patch, changed_path, base_content, current_content, callback) {
 		// Writes the content to the working tree path. 
-		var mkdirp = require('mkdirp');
-		var fn = pathlib.join(settings.code_directory, path);
+		var fn = pathlib.join(patch.export_path, changed_path + ".patch");
 		mkdirp(pathlib.dirname(fn), function(err) {
 			if (err)
 				callback(err)
 			else
-				fs.writeFile(fn, content, callback);
+				fs.writeFile(
+					fn,
+					diff.createPatch(changed_path,
+						base_content,
+						current_content,
+						patch.base_patch_id,
+						patch.id) ,
+					callback);
 		});
 	}
 
-	function delete_working_tree_path(path, callback) {
-		var fn = pathlib.join(settings.code_directory, path);
-		fs.unlink(fn, function(err) { callback(); }) // ignore error (hmmm...)
-	}
-
-	repo.clean_working_tree(settings.code_directory, function() {
-		// make the modifications specified by this patch in the working tree of the repository
-		async.map(
-			changed_paths || Object.keys(patch.files),
-			function(changed_path, callback) {
-				patch.getPathContent(changed_path, false, function(base_content, current_content) {
-					if (current_content != "")
-						write_working_tree_path(changed_path, current_content, callback);
-					else
-						delete_working_tree_path(changed_path, callback);
-				});
-			},
-			function(err, results) {
-				if (err) { callback(err); return; }
-				repo.commit(
-					settings.code_directory,
-					message || patch.id + "\n\n" + patch.notes,
-					settings.public_committer_name,
-					settings.public_committer_email,
-					new Date(patch.effective_date).toISOString(),
-					false, // don't sign because it will change the hash
-					function(commit_output) {
-						callback(null, commit_output);
-					});
+	function do_commit(dirPath, next_step) {
+		repo.commit(
+			dirPath,
+			"please fill this in",
+			settings.public_committer_name,
+			settings.public_committer_email,
+			null, // automatic date
+			false, // don't sign
+			function(commit_output) {
+				next_step();
 			}
 		);
-
-	});
+	}
 }
 
