@@ -982,7 +982,7 @@ exports.export_to_audit_log = function(callback) {
 		if (!patch.effective_date) { callback("Patch " + patch.id + " does not have an effective date set."); return; }
 		if (patch.draft) { callback("Patch " + patch.id + " is marked as a draft."); return; }
 
-		var fn = pathlib.join(patch.export_path, "metadata.json");
+		var fn = pathlib.join(patch.export_path, "metadata.yaml");
 		mkdirp(pathlib.dirname(fn), function(err) {
 			if (err) { callback(err); return; }
 
