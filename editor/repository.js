@@ -22,7 +22,7 @@ function execute_git(dir, args, env, callback) {
 			encoding: 'utf8',
 			cwd: dir
 		});
-	console.log("git", dir, args, env);
+	//console.log("git", dir, args, env);
 	git.stdout.on('data', function (data) {
 	  output += data;
 	});
