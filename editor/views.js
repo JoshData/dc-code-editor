@@ -1,9 +1,9 @@
 var swig  = require('swig');
 var pathlib  = require('path');
 var async = require('async');
+
 var patches = require("./patches.js");
 var repo = require("./repository.js");
-
 var settings = require("./settings.js");
 
 String.prototype.repeat = function( num ) { return new Array( num + 1 ).join( this ); }
@@ -339,7 +339,8 @@ exports.set_routes = function(app) {
 		// a list of all of the XInclude'd resources.
 		var other_resources_hrefs = Array();
 		dom.findall('.//ns0:include').forEach(function (elem) {
-			other_resources_hrefs.push(elem.get("href"));
+			if (elem.get("href"))
+				other_resources_hrefs.push(elem.get("href"));
 		});
 
 		// Asynchronously load all of the binary contents of these resources.
