@@ -35,6 +35,13 @@ This repository has been tested with Ubuntu 13.10 and node v0.10.26.
 	# make a workspace directory
 	git init workspace
 
+	# make an audit-log directory
+	git init audit-repo
+	cd audit-repo
+	git commit -m "initial commit" --allow-empty
+	git remote add origin git@github.com:someorg/dc-code-update-chart.git
+	cd ..
+
 Run
 ---
 

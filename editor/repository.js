@@ -2,6 +2,7 @@
 
 var fs = require("fs");
 var pathlib = require("path");
+var moment = require('moment');
 
 function execute_git(dir, args, env, callback) {
 	// Executes 'git' in a shell, captures its output to stdout,
@@ -35,6 +36,7 @@ function execute_git(dir, args, env, callback) {
 			console.log(output);
 			throw "git returned non-zero exit status. Arguments: " + args.join(", ");
 		}
+		console.log("git", args, env, output)
 		callback(output);
 	});
 }
@@ -48,6 +50,18 @@ exports.get_repository_head = function(dir, branch, callback) {
 		if (first_line[0] != "commit") throw "invalid git output";
 		callback(first_line[1]);
 	});
+}
+
+exports.get_commit_message = function(dir, commit, callback) {
+	execute_git(dir,
+		["log", "-n1", "--format=%B", commit],
+		null,
+		function(message) {
+			// Strip the message because we seem to get back trailing
+			// newlines.
+			message = message.replace(/\s+$/, '');
+			callback(message);
+		});
 }
 
 exports.ls = function(dir, hash, path, recursive, callback) {
@@ -124,11 +138,15 @@ exports.is_working_tree_dirty = function(dir, callback) {
 	});
 }
 
-exports.commit = function(dir, message, author_name, author_email, commit_date, sign, callback) {
+exports.word_diff = function(dir, commit, callback) {
+	execute_git(dir, ["diff", "--word-diff=porcelain", "-M", commit], null, callback);
+}
+
+exports.commit = function(dir, message, author_name, author_email, commit_date, sign, amend, callback) {
 	// Performs a commit using "git add -A" and "git commit".
 	execute_git(dir, ["add", "-A"], null, function() {
 		exports.is_working_tree_dirty(dir, function(is_dirty) {
-			if (!is_dirty) {
+			if (!is_dirty && !amend) {
 				// Nothing to commit. Silently don't do a commit.
 				callback("Nothing to commit.");
 				return;
@@ -140,6 +158,11 @@ exports.commit = function(dir, message, author_name, author_email, commit_date, 
 			var args = ["commit", "-m", message];
 			
 			if (sign) args.push("-S");
+			if (amend) { args.push("--amend"); args.push("--reset-author"); }
+			if (commit_date == "now")
+				commit_date = moment().format(); // current time in local time w/ timezone
+				// new Date().toISOString() returns the correct time but loses
+				// the locale's timezone which would be nice to keep.
 
 			execute_git(
 				dir,
@@ -152,7 +175,7 @@ exports.commit = function(dir, message, author_name, author_email, commit_date, 
 		           GIT_COMMITTER_EMAIL: author_email,
 		           GIT_COMMITTER_DATE: commit_date ? commit_date : "",
 				},
-				callback
+				function(output) { callback(null, output); }
 			);		
 		});
 	})
@@ -191,4 +214,9 @@ exports.check_if_gpg_key_exists = function(emailaddr, callback) {
 	git.on('close', function(exit_code) {
 		callback(exit_code == 0);
 	});
+}
+
+exports.push = function(dir, callback) {
+	// Performs a git push.
+	execute_git(dir, ["push", "--porcelain", "origin", "HEAD:master"], null, callback);
 }

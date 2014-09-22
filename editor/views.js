@@ -526,25 +526,85 @@ exports.set_routes = function(app) {
 			exports.getUser(req.user).committer_name,
 			exports.getUser(req.user).committer_email,
 			null, // commit date = current date
-			false, // sign
-			function(output) {
+			false, // don't sign
+			false, // don't amend
+			function(error, output) {
 				res.setHeader('Content-Type', 'application/json');
 				res.send(JSON.stringify({
 					"status": "ok",
-					"msg": output
+					"msg": error || output
 				}));
 		});
 	});
 
-	// Export The Code!
-	app.post('/_export', function(req, res){
+	// Review Changes for Publishing
+	var review_template = swig.compileFile(__dirname + '/templates/review.html');
+	app.get('/review', function(req, res) {
 		patches.export_to_audit_log(function(err) {
-			res.setHeader('Content-Type', 'application/json');
-			res.send(JSON.stringify({
-				"status": (!err ? "ok" : "error"),
-				"msg": ""+err
-			}));
+			repo.word_diff(settings.audit_repo_directory, "HEAD^..HEAD", function(diff) {
+				res.setHeader('Content-Type', 'text/html');
+				res.send(review_template({
+					csrf_token: req.csrfToken(), // passed to every template
+					error: err,
+					diff: diff.split(/\n/).map(function(line) {
+						var clz = "diff_unknown";
+						if (line.substring(0, 3) == "+++" || line.substring(0, 3) == "---" || line.substring(0, 6) == "index ") {
+							clz = "diff_hidden";
+						} else if (line.charAt(0) == "+") {
+							clz = "diff_add";
+							line = line.substring(1);
+						} else if (line.charAt(0) == "-") {
+							clz = "diff_remove";
+							line = line.substring(1);
+						} else if (line.charAt(0) == " ") {
+							clz = "diff_context";
+							line = line.substring(1);
+						} else if (line.charAt(0) == "~") {
+							clz = "diff_newline";
+							line = "";
+						} else if (m = /^diff --git a\/(\S*)/.exec(line)) {
+							clz = "diff_filename";
+							line = m[1];
+						}
+						return {
+							css_class: clz,
+							text: line,
+						};
+					})
+				}));
+			})
 		});
+	});
+	app.post('/review', function(req, res) {
+		if (!/\S/.test(req.body.summary1) || !/\S/.test(req.body.summary2)) {
+			// no message, just redirect back.
+			res.redirect("/review");
+		} else {
+			// Revise the top commit with the new log message.
+			var message = (req.body.summary1||"") + "\n\n" + (req.body.summary2||"");
+			repo.commit(
+				settings.audit_repo_directory,
+				message,
+				settings.public_committer_name,
+				settings.public_committer_email,
+				"now", // automatic date (when amending, resets date of commit)
+				false, // don't sign
+				true, // amend
+				function(error, output) {
+					if (error) {
+						res.setHeader('Content-Type', 'text/plain');
+						res.send(error);
+					} else {
+						// Push to remote repository.
+						repo.push(settings.audit_repo_directory, function(push_output) {
+							console.log("push", output);
+							res.setHeader('Content-Type', 'text/plain');
+							res.send(output + "\n\n" + push_output);
+						});
+					}
+				}
+			);
+		}
 	});
 
 	function get_macro_state(req) {

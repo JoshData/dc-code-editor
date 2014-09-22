@@ -5,8 +5,8 @@
 {% block body %}
 <div class="container">
 	<div style="float: right; text-align: right">
-		<a id="commit_workspace" href="#" onclick="return do_commit_workspace()" class="btn btn-warning {% if not workspace_is_dirty %}disabled{% endif %}">Commit Workspace</a>
-		<a href="#" onclick="return do_export_code()" class="btn btn-warning">Export to Audit Log</a>
+		<a id="commit_workspace" href="#" onclick="return do_commit_workspace()" class="btn btn-primary {% if not workspace_is_dirty %}disabled{% endif %}">Commit Workspace</a>
+		<a href="/review" class="btn btn-primary">Review &amp; Publish...</a>
 	</div>
 
 	<h1>Timeline</h1>
@@ -22,7 +22,7 @@
 				    <input name="name" type="text" class="form-control" id="new-patch-name" placeholder="L20-0108" onkeyup="update_new_patch_disabled()" onchange="update_new_patch_disabled()">
 				  </div>
 				  <button id="new-patch-submit" type="submit" class="btn btn-default disabled">New Patch</button>
-				  <p class="small text-muted" style="margin-top: .5em">examples: A20-0123, A20-0123_title_1, 20-technical_correction-01</p>
+				  <p class="small text-muted" style="margin-top: .5em">examples: A20-0123, A20-0123_title_1, 20-technical_correction-001</p>
 				</form>
 			</div>
 		</div>
@@ -172,26 +172,6 @@ function do_commit_workspace() {
 					$('#commit_workspace').addClass('disabled')
 				},
 				"Commit Workspace"
-			);
-		});
-	return false;
-}
-
-function do_export_code() {
-	show_modal_confirm(
-		"Export Code to Audit Log",
-		"This will update the local audit log repository with the contents of all of the non-draft patches.",
-		"Export",
-		function() {
-			// user says go for it
-			ajax_call(
-				"/_export",
-				{
-				},
-				function(res) {
-					show_modal_error("Export Code", "The export is complete.");
-				},
-				"Export Code"
 			);
 		});
 	return false;

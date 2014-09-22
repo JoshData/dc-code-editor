@@ -1028,17 +1028,20 @@ exports.export_to_audit_log = function(callback) {
 	}
 
 	function do_commit(dirPath, next_step) {
-		repo.commit(
-			dirPath,
-			"please fill this in",
-			settings.public_committer_name,
-			settings.public_committer_email,
-			null, // automatic date
-			false, // don't sign
-			function(commit_output) {
-				next_step();
-			}
-		);
+		repo.get_commit_message(dirPath, "HEAD", function(existing_message) {
+			var draft_message = "unpublished-draft-commit";
+			var amend = (existing_message == draft_message);
+			repo.commit(
+				dirPath,
+				draft_message,
+				settings.public_committer_name,
+				settings.public_committer_email,
+				"now", // automatic date (when amending, resets date of commit)
+				false, // don't sign
+				amend,
+				next_step
+			);
+		});
 	}
 }
 

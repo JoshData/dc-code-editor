@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Review for Publication{% endblock %}
+
+{% block head %}
+<style>
+	.diff_filename { display: block; margin: 1em 0; font-weight: bold; }
+	.diff_hidden { display: none; }
+	.diff_add { color: blue; text-decoration: underline; white-space: pre; }
+	.diff_remove { color: red; text-decoration: line-through; white-space: pre; }
+	.diff_context { white-space: pre; }
+	.diff_newline { display: block; }
+	.diff_unknown { display: block; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+	<h1>Review Code Changes for Publication</h1>
+
+	{% if error %}
+
+		<p style="text-danger">{{error}}</p>
+
+	{% else %}
+
+		<p>Review the changes to the Code since the last publication and write a public summary of the changes. When the changes look good, click the publish button.</p>
+
+		<form class="form-horizontal" role="form" style="margin: 2em; max-width: 60em" method="post" onsubmit="return validate_summary();">
+		  <input type="hidden" name="_csrf" value="{{csrf_token}}">
+		  <hr>
+		  <div class="form-group">
+		    <label for="inputSummary1" class="col-sm-1 control-label">Summary</label>
+		    <div class="col-sm-11">
+		      <input type="text" class="form-control" id="inputSummary1" name="summary1" placeholder="One-line description of changes">
+		    </div>
+		  </div>
+		  <div class="form-group">
+		    <label for="inputSummary2" class="col-sm-1 control-label">Notes</label>
+		    <div class="col-sm-11">
+		      <textarea class="form-control" id="inputSummary2" name="summary2" placeholder="Additional notes for this publication." rows="6"></textarea>
+		    </div>
+		  </div>
+		  <div class="form-group">
+		    <div class="col-sm-offset-1 col-sm-11">
+		      <button type="submit" class="btn btn-primary">Publish</button>
+		    </div>
+		  </div>
+		  <hr>
+		</form>
+
+		<div>
+			{% for line in diff %}
+				<span class="diff_line {{line.css_class}}">{{line.text}}</span>
+			{% endfor %}
+		</div>
+	{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function validate_summary() {
+	if (!/\S/.test($('#inputSummary1').val()) || !/\S/.test($('#inputSummary2').val())) {
+		// block form submission
+		show_modal_error("Publish", "Enter a summary and notes.");
+		return false;
+	}
+	return true;
+}
+</script>
+{% endblock %}
