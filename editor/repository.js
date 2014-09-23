@@ -32,12 +32,19 @@ function execute_git(dir, args, env, callback) {
 	});
 	git.on('close', function(exit_code) {
 		if (exit_code != 0) {
+			if (env && env.capture_error) {
+				callback(error_output);
+				return;
+			}
+
 			console.log(error_output);
 			console.log(output);
 			throw "git returned non-zero exit status. Arguments: " + args.join(", ");
+		} else if (env && env.capture_error) {
+			callback(null, output);
+		} else {
+			callback(output);
 		}
-		console.log("git", args, env, output)
-		callback(output);
 	});
 }
 
@@ -216,7 +223,7 @@ exports.check_if_gpg_key_exists = function(emailaddr, callback) {
 	});
 }
 
-exports.push = function(dir, callback) {
+exports.push = function(dir, refspec, callback) {
 	// Performs a git push.
-	execute_git(dir, ["push", "--porcelain", "origin", "HEAD:master"], null, callback);
+	execute_git(dir, ["push", "--porcelain", "origin", refspec], {capture_error: true}, callback);
 }

@@ -5,6 +5,7 @@ var async = require('async');
 var patches = require("./patches.js");
 var repo = require("./repository.js");
 var settings = require("./settings.js");
+var publish = require("./publish.js");
 
 String.prototype.repeat = function( num ) { return new Array( num + 1 ).join( this ); }
 
@@ -540,7 +541,7 @@ exports.set_routes = function(app) {
 	// Review Changes for Publishing
 	var review_template = swig.compileFile(__dirname + '/templates/review.html');
 	app.get('/review', function(req, res) {
-		patches.export_to_audit_log(function(err) {
+		publish.export_to_audit_log(function(err) {
 			repo.word_diff(settings.audit_repo_directory, "HEAD^..HEAD", function(diff) {
 				res.setHeader('Content-Type', 'text/html');
 				res.send(review_template({
@@ -582,28 +583,10 @@ exports.set_routes = function(app) {
 		} else {
 			// Revise the top commit with the new log message.
 			var message = (req.body.summary1||"") + "\n\n" + (req.body.summary2||"");
-			repo.commit(
-				settings.audit_repo_directory,
-				message,
-				settings.public_committer_name,
-				settings.public_committer_email,
-				"now", // automatic date (when amending, resets date of commit)
-				false, // don't sign
-				true, // amend
-				function(error, output) {
-					if (error) {
-						res.setHeader('Content-Type', 'text/plain');
-						res.send(error);
-					} else {
-						// Push to remote repository.
-						repo.push(settings.audit_repo_directory, function(push_output) {
-							console.log("push", output);
-							res.setHeader('Content-Type', 'text/plain');
-							res.send(output + "\n\n" + push_output);
-						});
-					}
-				}
-			);
+			publish.publish(message, function(error, output) {
+				res.setHeader('Content-Type', 'text/plain');
+				res.send(error || output);
+			})
 		}
 	});
 
