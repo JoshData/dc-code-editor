@@ -16,7 +16,6 @@ This repository has been tested with Ubuntu 13.10 and node v0.10.26.
 	git submodule update --init
 
 	# install dependencies
-	sudo apt-get install gnupg2
 	npm install
 
 	# install dependencies of simple-2

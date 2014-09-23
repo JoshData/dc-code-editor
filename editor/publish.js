@@ -233,7 +233,7 @@ exports.publish_audit_log = function(message, callback) {
 	);	
 }
 
-exports.compile_out = function(callback) {
+exports.compile_code = function(callback) {
 	var audit_log = yaml.safeLoad(fs.readFileSync(pathlib.join(settings.audit_repo_directory, 'metadata.yaml')));
 
 	// Checkout the root commit.
@@ -358,7 +358,7 @@ function update_recency(callback) {
 
 exports.publish_code = function(callback) {
 	// Compile out to the code repository.
-	exports.compile_out(function(compile_err, compile_tag) {
+	exports.compile_code(function(compile_err, compile_tag) {
 		if (compile_err) {
 			callback("code compiler error: " + compile_err);
 			return;
@@ -397,12 +397,13 @@ function findFiles(root, path, result) {
 // When called directly from the command line...
 if (require.main === module) {
 	if (!process.argv[2]) {
-		console.log("usage: node editor/publish.js code")
+		console.log("usage: node editor/publish.js compile-code")
 		process.exit()
 	}
 
-	if (process.argv[2] == "code") {
-		exports.publish_code(function(error, output) {
+	if (process.argv[2] == "compile-code") {
+	
+		exports.compile_code(function(error, output) {
 			console.log(error || output)
 		})
 	}
