@@ -61,13 +61,18 @@ exports.get_repository_head = function(dir, branch, callback) {
 
 exports.get_commit_message = function(dir, commit, callback) {
 	execute_git(dir,
-		["log", "-n1", "--format=%B", commit],
+		["log", "-n1", "--format=%ai%n%B", commit],
 		null,
 		function(message) {
+			// Segment out the date.
+			var firstn = message.indexOf("\n");
+			var commit_date = moment(message.substring(0, firstn));
+			message = message.substring(firstn+1)
+
 			// Strip the message because we seem to get back trailing
 			// newlines.
 			message = message.replace(/\s+$/, '');
-			callback(message);
+			callback(commit_date, message);
 		});
 }
 
@@ -189,7 +194,7 @@ exports.commit = function(dir, message, author_name, author_email, commit_date, 
 }
 
 exports.tag = function(dir, commit, tagname, message, sign, author_name, author_email, callback) {
-	var args = ["tag", "-m", message];
+	var args = ["tag", "-f", "-m", message];
 	if (sign) { args.push("-s"); }
 	args.push(tagname);
 	args.push(commit);

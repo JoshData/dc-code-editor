@@ -542,6 +542,11 @@ exports.set_routes = function(app) {
 	var review_template = swig.compileFile(__dirname + '/templates/review.html');
 	app.get('/review', function(req, res) {
 		publish.export_to_audit_log(function(err) {
+			if (err) {
+				res.setHeader('Content-Type', 'text/plain');
+				res.send(err);
+				return;
+			}
 			repo.word_diff(settings.audit_repo_directory, "HEAD^..HEAD", function(diff) {
 				res.setHeader('Content-Type', 'text/html');
 				res.send(review_template({

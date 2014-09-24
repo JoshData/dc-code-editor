@@ -10,6 +10,7 @@ var moment = require('moment');
 var yaml = require('js-yaml');
 var temp = require("temp").track();
 var mkdirp = require('mkdirp');
+var csv = require('csv');
 
 var repo = require("./repository.js");
 var settings = require("./settings.js");
@@ -179,7 +180,7 @@ exports.export_to_audit_log = function(callback) {
 	}
 
 	function do_commit(dirPath, next_step) {
-		repo.get_commit_message(dirPath, "HEAD", function(existing_message) {
+		repo.get_commit_message(dirPath, "HEAD", function(commit_date, existing_message) {
 			var draft_message = "unpublished-draft-commit";
 			var amend = (existing_message == draft_message);
 			repo.commit(
@@ -247,6 +248,10 @@ exports.compile_code = function(callback) {
 					return;
 				}
 
+				// Initialize an update chart.
+				var update_chart_fn = pathlib.join(settings.code_directory, 'update-chart.csv');
+				fs.writeFileSync(update_chart_fn, "act,effective_date,guid\n");
+
 				// Commit the patches one by one.
 				async.eachSeries(
 					audit_log.patches,
@@ -280,6 +285,30 @@ exports.compile_code = function(callback) {
 							fs.writeFileSync(fn, diff.applyPatch(base, unifieddiff));
 						}
 
+						// Write basic <recency> information. Omit the parts related to
+						// the publication of the Code as a whole so that we don't cause
+						// hashes to change unnecessarily in past laws each time the code
+						// is published.
+						var indexfn = pathlib.join(settings.code_directory, 'index.xml');
+						var xml = fs.readFileSync(indexfn, { encoding: 'utf8' });
+						xml = xml.replace(
+							/<recency>[\w\W]*<\/recency>/,
+							"<recency>"
+							+ "\n      <last-act>D.C. Act " + patch_metadata.actNumber + "</last-act>"
+							+ "\n      <effective-date>" + moment(patch_metadata.effectiveDate).format() + "</effective-date>"
+							+ "\n    </recency>");
+						fs.writeFileSync(indexfn, xml);
+
+						// Append to update chart if this patch is for an act.
+						if (patch_metadata.actNumber) {
+							var updt = fs.readFileSync(update_chart_fn, { encoding: 'utf8' });
+							updt += patch_metadata.actNumber
+								+ "," + moment(patch_metadata.effectiveDate).format()
+								+ "," + patch_metadata.id
+								+ "\n";
+							fs.writeFileSync(update_chart_fn, updt);
+						}
+
 						// Make a commit.
 						repo.commit(
 							settings.code_directory,
@@ -301,14 +330,14 @@ exports.compile_code = function(callback) {
 						}
 
 						// Update recency metadata in a final commit on the new tag.
-						update_recency(function() {
+						update_recency(function(publication_date) {
 							// Make a (signed?) tag for the last commit. We don't sign
 							// the individual commits because each time we export the
 							// hashes will change. Rather, we want to take advantage of
 							// the hashes being stable (so long as the patch doesn't change)
 							// so that re-exporting over and over won't blow up the repository.
 							repo.get_repository_head(settings.code_directory, null, function(hash) {
-								var tag_name = "update_" + new Date().toISOString().replace(/[^0-9]/g, "");
+								var tag_name = "update_" + publication_date.format().replace(/[^0-9]/g, "");
 								repo.tag(
 									settings.code_directory,
 									hash,
@@ -331,31 +360,48 @@ exports.compile_code = function(callback) {
 
 function update_recency(callback) {
 	repo.get_repository_head(settings.audit_repo_directory, null, function(hash) {
-		repo.get_commit_message(settings.audit_repo_directory, hash, function(message) {
-			// Replace <recency>.
-			var indexfn = pathlib.join(settings.code_directory, 'index.xml');
-			var xml = fs.readFileSync(indexfn, { encoding: 'utf8' });
-			xml = xml.replace(
-				/<recency>.*<\/recency>/,
-				"<recency>" + moment().format() + " " + hash + "</recency>");
-			fs.writeFileSync(indexfn, xml);
+		repo.get_commit_message(settings.audit_repo_directory, hash, function(commit_date, message) {
+			get_recency_description(function(last_act, effective_date) {
+				// Replace <recency>.
+				var indexfn = pathlib.join(settings.code_directory, 'index.xml');
+				var xml = fs.readFileSync(indexfn, { encoding: 'utf8' });
+				xml = xml.replace(
+					/<recency>[\w\W]*<\/recency>/,
+					"<recency>"
+					+ "\n      <last-act>" + last_act + "</last-act>"
+					+ "\n      <effective-date>" + effective_date.format() + "</effective-date>"
+					+ "\n      <publication-date>" + commit_date.format() + "</publication-date>"
+					+ "\n      <audit-log-commit>" + hash + "</audit-log-commit>"
+					+ "\n    </recency>");
+				fs.writeFileSync(indexfn, xml);
 
-			// Commit.
-			repo.commit(
-				settings.code_directory,
-				message + "\n\n" + hash,
-				settings.public_committer_name,
-				settings.public_committer_email,
-				null, // automatic date
-				false, // sign?
-				false, // don't amend
-				function(commit_output) {
-					callback() // done
-				});
+				// Commit.
+				repo.commit(
+					settings.code_directory,
+					message + "\n\n" + hash,
+					settings.public_committer_name,
+					settings.public_committer_email,
+					commit_date.format(), // match same date as audit log's latest commit so that this is stable
+					false, // sign?
+					false, // don't amend
+					function(commit_output) {
+						callback(commit_date) // done
+					});
+			});
 		})
 	});
 }
 
+function get_recency_description(callback) {
+	// Get a nice description of most recent act codified.
+	var update_chart_fn = pathlib.join(settings.code_directory, 'update-chart.csv');
+	var update_chart = fs.readFileSync(update_chart_fn, { encoding: 'utf8' });
+	csv.parse(update_chart, function(err, data) {
+		var most_recent_act = data[data.length-1][0];
+		var most_recent_eff_date = data[data.length-1][1];
+		callback("DC Act " + most_recent_act, moment(most_recent_eff_date))
+	})
+}
 exports.publish_code = function(callback) {
 	// Compile out to the code repository.
 	exports.compile_code(function(compile_err, compile_tag) {
@@ -393,6 +439,7 @@ function findFiles(root, path, result) {
 	}
 	return result;
 }
+
 
 // When called directly from the command line...
 if (require.main === module) {
