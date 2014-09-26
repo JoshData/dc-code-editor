@@ -194,7 +194,7 @@ function new_patch_internal(patch) {
 	return Patch.load(patch.id);
 }
 
-Patch.prototype.createChild = function() {
+Patch.prototype.createChild = function(base_name) {
 	/* Creates a new Patch that continues from this patch, its base_patch.
 	   Returns the new Patch instance immediately. */
 
@@ -202,7 +202,7 @@ Patch.prototype.createChild = function() {
 	var new_id;
 	var ctr = 0;
 	while (true) {
-		new_id = "NewPatch";
+		new_id = (base_name || "NewPatch");
 		if (ctr > 0) new_id += "_" + ctr;
 		if (!fs.existsSync(settings.workspace_directory + "/" + new_id)) break;
 		ctr++;

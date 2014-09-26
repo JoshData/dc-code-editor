@@ -36,18 +36,24 @@
 					<div>
 						{% if patch.type == 'patch' && patch.indent == 0 %}
 							<span class="drag-handle">☰</span>
+						{% elif patch.type == 'patch' %}
 						{% else %}
 							<span class="fake-drag-handle">☰</span>
 						{% endif %}
 
 						<a href="{{patch.edit_url}}">{{patch.id}}</a>
 					</div>
-					<div class="timeline-patch-metadata">
+					<div class="timeline-patch-metadata" {% if patch.indent > 0 %}style="margin-left: 0"{% endif %}>
 						{% if patch.type == "patch" %}
-							{% if patch.draft %}
+							{% if patch.indent > 0 %}
+								<div>draft revision to {{patch_array[0].patch.id}} (merge to finish)</div>
+							{% elif patch.draft %}
 								<div class="draft">draft</div>
 							{% endif %}
-							<div class="effective-date" data-effective-date="{{patch.effective_date_stamp}}"><em>Effective Date:</em> <span>{{patch.effective_date_display}}</span></div>
+
+							{% if patch.indent == 0 %}
+								<div class="effective-date" data-effective-date="{{patch.effective_date_stamp}}"><em>Effective Date:</em> <span>{{patch.effective_date_display}}</span></div>
+							{% endif %}
 						{% endif %}
 					</div>
 				</div>

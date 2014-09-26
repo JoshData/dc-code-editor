@@ -101,19 +101,20 @@ exports.set_routes = function(app) {
 	// New Patch
 	app.post('/patch/:patch/_new', function(req, res){
 		var patch = patches.Patch.load(req.params.patch);
-		patch = patch.createChild();
 
-		function do_redirect(err, patch) {
-			if (!req.body.file)
-				res.redirect(patch.edit_url);
-			else
-				res.redirect(patch.edit_url + "/editor?file=" + req.body.file);
-		}
+		// What to name it?
+		var base_name = null; // 'new patch'
+		if (req.body.reason == "revision")
+			base_name = patch.id + "-revision";
+		else if (req.body.name)
+			base_name = req.body.name;
 
-		if (req.body.name)
-			patch.rename(req.body.name, do_redirect)
+		patch = patch.createChild(base_name);
+
+		if (!req.body.file)
+			res.redirect(patch.edit_url);
 		else
-			do_redirect(null, patch);
+			res.redirect(patch.edit_url + "/editor?file=" + req.body.file);
 	});
 
 	// Rename/Delete/Modify Patch

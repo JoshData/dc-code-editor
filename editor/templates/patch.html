@@ -99,6 +99,7 @@
 
 				<form class="form-inline" role="form" action="{{patch.edit_url}}/_new" method="post" style="margin: 1em 0 2em 1em">
 					<input type="hidden" name="_csrf" value="{{csrf_token}}">
+					<input type="hidden" name="reason" value="revision">
 					<button type="submit" class="btn btn-default">Begin Revision to {{patch.id}}</button>
 				</form>
 			{% endif %}
