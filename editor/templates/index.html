@@ -19,7 +19,7 @@
 				<form class="form-inline" role="form" action="{{head_patch.edit_url}}/_new" onclick="return validate_new_patch_name();" method="post">
 				  <input type="hidden" name="_csrf" value="{{csrf_token}}">
 				  <div class="form-group">
-				    <input name="name" type="text" class="form-control" id="new-patch-name" placeholder="L20-0108" onkeyup="update_new_patch_disabled()" onchange="update_new_patch_disabled()">
+				    <input name="name" type="text" class="form-control" id="new-patch-name" placeholder="A20-0123" onkeyup="update_new_patch_disabled()" onchange="update_new_patch_disabled()">
 				  </div>
 				  <button id="new-patch-submit" type="submit" class="btn btn-default disabled">New Patch</button>
 				  <p class="small text-muted" style="margin-top: .5em">examples: A20-0123, A20-0123_title_1, 20-technical_correction-001</p>
