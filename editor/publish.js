@@ -107,7 +107,7 @@ exports.export_to_audit_log = function(callback) {
 			return;
 		}
 
-		fs.writeFileSync(pathlib.join(dirPath, "metadata.yaml"), yaml.safeDump({
+		fs.writeFileSync(pathlib.join(dirPath, "index.yaml"), yaml.safeDump({
 			"root": {
 				"id": root_patch.id,
 				"hash": root_patch.hash,
@@ -235,7 +235,7 @@ exports.publish_audit_log = function(message, callback) {
 }
 
 exports.compile_code = function(callback) {
-	var audit_log = yaml.safeLoad(fs.readFileSync(pathlib.join(settings.audit_repo_directory, 'metadata.yaml')));
+	var audit_log = yaml.safeLoad(fs.readFileSync(pathlib.join(settings.audit_repo_directory, 'index.yaml')));
 
 	// Checkout the root commit.
 	repo.clean_working_tree(settings.code_directory, function() {
